@@ -21,10 +21,15 @@ COPY --from=builder /app/stations.json ./
 RUN addgroup -g 1001 nodejs && \
     adduser -S botuser -u 1001 -G nodejs
 
-USER botuser
 RUN mkdir -p /app/pdfs && \
     mkdir -p /app/output && \
     mkdir -p /app/temp
+RUN chown -R botuser:botuser /app/pdfs && \
+    chown -R botuser:botuser /app/output && \
+    chown -R botuser:botuser /app/temp
+VOLUME ["/app/pdfs", "/app/output"]
+
+USER botuser
 
 ENTRYPOINT ["/sbin/tini", "--"]
 
