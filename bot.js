@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const { reprocess, extractVigorDate, PDF_DIR } = require('./processor');
 
@@ -63,7 +63,7 @@ bot.on('document', async (msg) => {
             return;
         }
 
-        fs.renameSync(tempPath, finalPath);
+        fs.moveSync(tempPath, finalPath);
         bot.sendMessage(chatId, `Procesando...`);
 
         await reprocess();
