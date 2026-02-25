@@ -24,9 +24,9 @@ RUN addgroup -g 1001 nodejs && \
 RUN mkdir -p /app/pdfs && \
     mkdir -p /app/output && \
     mkdir -p /app/temp
-RUN chown -R botuser:botuser /app/pdfs && \
-    chown -R botuser:botuser /app/output && \
-    chown -R botuser:botuser /app/temp
+RUN chown -R botuser:nodejs /app/pdfs && \
+    chown -R botuser:nodejs /app/output && \
+    chown -R botuser:nodejs /app/temp
 VOLUME ["/app/pdfs", "/app/output"]
 
 USER botuser
