@@ -18,9 +18,9 @@ function normalize(text) {
         .replace(/'/g, '')
         .replace(/\b(madrid|barcelona|valencia|sevilla|donostia|bilbao|barna|irun)-\b/g, '')
         .replace(/\b(apd|cgd|estacion|mercan-|mercan|p\.k\.|pk|bif\.)\b/g, '')
+        .replace('glories', 'glorias')
         .replace(/[^a-z0-9]/g, ' ')
         .replace(/\s+/g, ' ')
-        .replace('glories', 'glorias')
         .trim();
 }
 

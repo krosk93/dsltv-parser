@@ -22,6 +22,9 @@ RUN addgroup -g 1001 nodejs && \
     adduser -S botuser -u 1001 -G nodejs
 
 USER botuser
+RUN mkdir -p /app/pdfs && \
+    mkdir -p /app/output && \
+    mkdir -p /app/temp
 
 ENTRYPOINT ["/sbin/tini", "--"]
 

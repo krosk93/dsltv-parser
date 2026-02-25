@@ -30,7 +30,7 @@ bot.on('document', async (msg) => {
 
     try {
         const fileLink = await bot.getFileLink(fileId);
-        const tempPath = path.join(__dirname, 'temp_' + fileName);
+        const tempPath = path.join(__dirname, 'temp', fileName);
 
         // Download file
         const response = await axios({
