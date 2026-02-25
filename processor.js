@@ -166,10 +166,30 @@ async function geocode(ltvData) {
     return ltvData;
 }
 
-async function reprocess() {
-    console.log('Reprocessing all PDFs...');
+async function convertToJson() {
+    console.log('Migrating PDFs to JSONs...');
     const files = fs.readdirSync(PDF_DIR)
         .filter(f => f.toLowerCase().endsWith('.pdf'))
+        .map(f => {
+            return {
+                name: f,
+                path: path.join(PDF_DIR, f)
+            };
+        });
+    for (const file of files) {
+        console.log(`Parsing ${file.name}...`);
+        const parsedData = await parseSinglePdf(file.path);
+        const newFileName = file.name.replace('.pdf', '.json');
+        const finalPath = path.join(PDF_DIR, newFileName);
+        fs.writeFileSync(finalPath, JSON.stringify(parsedData, null, 2));
+        fs.unlinkSync(file.path);
+    }
+}
+
+async function reprocess() {
+    console.log('Reprocessing all JSONs...');
+    const files = fs.readdirSync(PDF_DIR)
+        .filter(f => f.toLowerCase().endsWith('.json'))
         .map(f => {
             const dateMatch = f.match(/^(\d{4})(\d{2})(\d{2})/);
             return {
@@ -183,7 +203,7 @@ async function reprocess() {
     const globalLtvMap = new Map();
     for (const file of files) {
         console.log(`Parsing ${file.name}...`);
-        const records = await parseSinglePdf(file.path);
+        const records = JSON.parse(fs.readFileSync(file.path, 'utf8'));
         for (const rec of records) {
             if (!globalLtvMap.has(rec.code)) {
                 const { line, ...rest } = rec;
@@ -216,4 +236,4 @@ async function reprocess() {
     return enriched;
 }
 
-module.exports = { reprocess, extractVigorDate, PDF_DIR };
+module.exports = { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR };

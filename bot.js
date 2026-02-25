@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const { reprocess, extractVigorDate, PDF_DIR } = require('./processor');
+const { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR } = require('./processor');
 
 // Replace with your actual token or use process.env.TOKEN
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -55,7 +55,7 @@ bot.on('document', async (msg) => {
             return;
         }
 
-        const newFileName = `${vigorDate}_DSLTV.pdf`;
+        const newFileName = `${vigorDate}_DSLTV.json`;
         const finalPath = path.join(PDF_DIR, newFileName);
 
         if (fs.existsSync(finalPath)) {
@@ -63,8 +63,16 @@ bot.on('document', async (msg) => {
             return;
         }
 
-        fs.moveSync(tempPath, finalPath);
-        bot.sendMessage(chatId, `Procesando...`);
+        const parsedData = await parseSinglePdf(tempPath);
+
+        if (parsedData.length === 0) {
+            bot.sendMessage(chatId, 'Vaya, el PDF no parece ser un DSLTV válido. ¿Podrías verificarlo?');
+            fs.unlinkSync(tempPath);
+            return;
+        }
+
+        fs.writeFileSync(finalPath, JSON.stringify(parsedData, null, 2));
+        fs.unlinkSync(tempPath);
 
         await reprocess();
         bot.sendMessage(chatId, `¡Gracias por tu aportación!`);
@@ -78,3 +86,5 @@ bot.on('document', async (msg) => {
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, '¡Bienvenido! Puedes enviarme los PDFs de DSLTV y los procesaré automáticamente.');
 });
+
+convertToJson();
