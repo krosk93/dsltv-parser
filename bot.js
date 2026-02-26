@@ -22,11 +22,12 @@ bot.on('document', async (msg) => {
     const fileName = msg.document.file_name;
 
     if (!fileName.toLowerCase().endsWith('.pdf')) {
-        bot.sendMessage(chatId, 'Por favor, envía un archivo PDF.');
+        bot.sendMessage(chatId, 'Si us plau, envia un fitxer PDF.');
+        bot.deleteMessage(chatId, msg.message_id);
         return;
     }
 
-    bot.sendMessage(chatId, 'Procesando tu PDF, por favor espera...');
+    bot.sendMessage(chatId, 'Processant el fitxer PDF, si us plau, espera...');
 
     try {
         const fileLink = await bot.getFileLink(fileId);
@@ -47,10 +48,12 @@ bot.on('document', async (msg) => {
             writer.on('error', reject);
         });
 
+        bot.deleteMessage(chatId, msg.message_id);
+
         // Extract date
         const vigorDate = await extractVigorDate(tempPath);
         if (!vigorDate) {
-            bot.sendMessage(chatId, 'Vaya, el PDF no parece ser un DSLTV válido. ¿Podrías verificarlo?');
+            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un DSLTV vàlid. Si us plau, verifica-ho.');
             fs.unlinkSync(tempPath);
             return;
         }
@@ -59,14 +62,14 @@ bot.on('document', async (msg) => {
         const finalPath = path.join(PDF_DIR, newFileName);
 
         if (fs.existsSync(finalPath)) {
-            bot.sendMessage(chatId, `¡Gracias por tu aportación!`);
+            bot.sendMessage(chatId, `Gracies per a la teva contribució!`);
             return;
         }
 
         const parsedData = await parseSinglePdf(tempPath);
 
         if (parsedData.length === 0) {
-            bot.sendMessage(chatId, 'Vaya, el PDF no parece ser un DSLTV válido. ¿Podrías verificarlo?');
+            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un DSLTV vàlid. Si us plau, verifica-ho.');
             fs.unlinkSync(tempPath);
             return;
         }
@@ -75,16 +78,16 @@ bot.on('document', async (msg) => {
         fs.unlinkSync(tempPath);
 
         await reprocess();
-        bot.sendMessage(chatId, `¡Gracias por tu aportación!`);
+        bot.sendMessage(chatId, `Gracies per a la teva contribució!`);
 
     } catch (error) {
         console.error('Error processing bot request:', error);
-        bot.sendMessage(chatId, 'Ha ocurrido un error procesando el archivo. ¿Podrías intentarlo de nuevo?');
+        bot.sendMessage(chatId, 'Sembla que no hem pogut processar el fitxer. Pots intentar-ho de nou?');
     }
 });
 
 bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, '¡Bienvenido! Puedes enviarme los PDFs de DSLTV y los procesaré automáticamente.');
+    bot.sendMessage(msg.chat.id, 'Benvingut! Pots enviar-me PDFs de DSLTV i els processaré automàticament. Un cop processat, esborraré el PDF.');
 });
 
 convertToJson();
