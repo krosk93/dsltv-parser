@@ -43,10 +43,24 @@ async function extractVigorDate(filePath) {
     const parser = new PDFParse({ data: dataBuffer });
     try {
         const result = await parser.getText({ first: 2 });
-        const match = result.text.match(/(\d{2})\/(\d{2})\/(\d{4}).*Fecha Vigor/i);
+        const match = result.text.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2})\:(\d{2}).*Fecha Vigor/i);
         if (match) {
-            return `${match[3]}${match[2]}${match[1]}`; // YYYYMMDD
+            return `${match[3]}${match[2]}${match[1]}_${match[4]}${match[5]}`; // YYYYMMDD_HHMM
         }
+    } catch (err) {
+        console.error('Error extracting date:', err);
+    } finally {
+        await parser.destroy();
+    }
+    return null;
+}
+
+async function isWeekly(filePath) {
+    const dataBuffer = fs.readFileSync(filePath);
+    const parser = new PDFParse({ data: dataBuffer });
+    try {
+        const result = await parser.getText({ partial: [1] });
+        return result.text.includes('SEMANAL');
     } catch (err) {
         console.error('Error extracting date:', err);
     } finally {
@@ -64,6 +78,8 @@ async function parseSinglePdf(filePath) {
     try {
         const info = await parser.getInfo();
         const totalPages = info.total;
+        const isWeekly = (await parser.getText({ partial: [1] })).text.includes('SEMANAL');
+
 
         for (let i = 1; i <= totalPages; i++) {
             let tableRows = [];
@@ -189,7 +205,7 @@ async function convertToJson() {
 async function reprocess() {
     console.log('Reprocessing all JSONs...');
     const files = fs.readdirSync(PDF_DIR)
-        .filter(f => f.toLowerCase().endsWith('.json'))
+        .filter(f => f.toLowerCase().endsWith('_dsltv.json'))
         .map(f => {
             const dateMatch = f.match(/^(\d{4})(\d{2})(\d{2})/);
             return {
@@ -236,4 +252,4 @@ async function reprocess() {
     return enriched;
 }
 
-module.exports = { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR };
+module.exports = { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR, isWeekly };

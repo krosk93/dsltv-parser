@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR } = require('./processor');
+const { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR, isWeekly } = require('./processor');
 
 // Replace with your actual token or use process.env.TOKEN
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -58,7 +58,11 @@ bot.on('document', async (msg) => {
             return;
         }
 
-        const newFileName = `${vigorDate}_DSLTV.json`;
+        let newFileName = `${vigorDate}_DSLTV.json`;
+        const weekly = await isWeekly(tempPath);
+        if (!weekly) {
+            newFileName = `${vigorDate}_DHLTV.json`;
+        }
         const finalPath = path.join(PDF_DIR, newFileName);
 
         if (fs.existsSync(finalPath)) {
@@ -90,4 +94,7 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, 'Benvingut! Pots enviar-me PDFs de DSLTV i els processaré automàticament. Un cop processat, esborraré el PDF.');
 });
 
-convertToJson();
+(async function () {
+    await convertToJson();
+    await reprocess();
+})();
