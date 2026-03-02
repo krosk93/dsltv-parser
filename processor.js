@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PDFParse } = require('pdf-parse');
+const turf = require('@turf/turf');
 
 const PDF_DIR = path.join(__dirname, 'pdfs');
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -16,9 +17,9 @@ function normalize(text) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/'/g, '')
-        .replace(/\b(madrid|barcelona|valencia|sevilla|donostia|bilbao|barna|irun)-\b/g, '')
-        .replace(/\b(apd|cgd|estacion|mercan-|mercan|p\.k\.|pk|bif\.)\b/g, '')
-        .replace('glories', 'glorias')
+        .replace(/\b(madrid|barcelona|valencia|sevilla|donostia|bilbao|barna|irun)[\s.-]+/g, '')
+        .replace(/\b(apd|cgd|estacion|estacio|est|mercan|pk|p\.k\.|bif)[\s.-]+/g, '')
+        .replace(/glories(?:[\s.-]*clot)?/g, 'glorias')
         .replace(/[^a-z0-9]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -182,6 +183,67 @@ async function geocode(ltvData) {
     return ltvData;
 }
 
+async function reverseGeocode(ltvData) {
+    console.log('Reverse geocoding entries with local GeoJSON data...');
+
+    let provincesGeoJSON;
+    let ccaaGeoJSON;
+
+    try {
+        provincesGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'provinces.geojson'), 'utf8'));
+        ccaaGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'communities.geojson'), 'utf8'));
+    } catch (e) {
+        console.warn('GeoJSON data not found, skipping reverse geocoding');
+        return ltvData;
+    }
+
+    const cacheData = {};
+
+    for (const lineName in ltvData) {
+        for (const record of ltvData[lineName]) {
+            if (record.latitude && record.longitude) {
+                const lat = record.latitude.toFixed(4);
+                const lon = record.longitude.toFixed(4);
+                const cacheKey = `${lat},${lon}`;
+
+                if (cacheData[cacheKey]) {
+                    if (cacheData[cacheKey].province) record.province = cacheData[cacheKey].province;
+                    if (cacheData[cacheKey].state) record.state = cacheData[cacheKey].state;
+                    continue;
+                }
+
+                try {
+                    const point = turf.point([record.longitude, record.latitude]);
+                    let province = '';
+                    let state = '';
+
+                    for (const feature of provincesGeoJSON.features) {
+                        if (turf.booleanPointInPolygon(point, feature.geometry)) {
+                            province = feature.properties.name;
+                            break;
+                        }
+                    }
+
+                    for (const feature of ccaaGeoJSON.features) {
+                        if (turf.booleanPointInPolygon(point, feature.geometry)) {
+                            state = feature.properties.name;
+                            break;
+                        }
+                    }
+
+                    if (province) record.province = province;
+                    if (state) record.state = state;
+
+                    cacheData[cacheKey] = { province, state };
+                } catch (err) {
+                    console.error(`Error reverse geocoding for ${lat}, ${lon}:`, err.message);
+                }
+            }
+        }
+    }
+    return ltvData;
+}
+
 async function convertToJson() {
     console.log('Migrating PDFs to JSONs...');
     const files = fs.readdirSync(PDF_DIR)
@@ -246,7 +308,9 @@ async function reprocess() {
     const sortedGrouped = {};
     Object.keys(grouped).sort().forEach(key => { sortedGrouped[key] = grouped[key]; });
 
-    const enriched = await geocode(sortedGrouped);
+    let enriched = await geocode(sortedGrouped);
+    enriched = await reverseGeocode(enriched);
+
     fs.writeFileSync(LTV_JSON, JSON.stringify(enriched, null, 2));
     console.log('Regeneration complete.');
     return enriched;
