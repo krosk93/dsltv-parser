@@ -10,6 +10,7 @@ const STATIONS_FILE = path.join(__dirname, 'stations.json');
 const LTV_JSON = path.join(OUTPUT_DIR, 'ltv.json');
 
 const WFS_BASE = 'https://ideadif.adif.es/gservices/Tramificacion/wfs';
+const DESIGN_SPEED_WFS = 'https://ideadif.adif.es/services/wfs';
 const WFS_CACHE_DIR = path.join(__dirname, 'wfs');
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR);
@@ -256,12 +257,106 @@ async function fetchPKTeoricos(codtramoPrefix) {
 }
 
 /**
+ * Fetches all design speeds from ADIF's secondary WFS (INSPIRE).
+ * Returns a Map of codtramo -> design speed (km/h).
+ * Results are cached in a local file.
+ */
+async function fetchDesignSpeeds() {
+    const cacheFile = path.join(WFS_CACHE_DIR, 'design_speeds.json');
+    if (fs.existsSync(cacheFile)) {
+        const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+        return new Map(Object.entries(data));
+    }
+
+    console.log('  Fetching track design speeds from ADIF INSPIRE WFS...');
+    try {
+        const url = `${DESIGN_SPEED_WFS}?service=WFS&version=2.0.0&request=GetFeature&typename=tn-ra:DesignSpeed`;
+        const response = await axios.get(url, { timeout: 60000 });
+        const xml = response.data;
+        const speeds = {};
+
+        // Use regex for simple GML parsing (faster and no extra deps)
+        const regex = /<tn-ra:DesignSpeed[^>]+gml:id=\"TN_DesignSpeed_(.*?)\">.*?<tn-ra:speed[^>]*>(.*?)<\/tn-ra:speed>/gs;
+        let match;
+        while ((match = regex.exec(xml)) !== null) {
+            speeds[match[1]] = parseFloat(match[2]);
+        }
+
+        fs.writeFileSync(cacheFile, JSON.stringify(speeds, null, 2));
+        console.log(`  Loaded ${Object.keys(speeds).length} design speed entries`);
+        return new Map(Object.entries(speeds));
+    } catch (err) {
+        console.warn(`  Track design speed query failed: ${err.message}`);
+        return new Map();
+    }
+}
+
+/**
+ * Calculates the extra time (delay) in seconds for a speed limitation,
+ * including deceleration and acceleration phases.
+ */
+function calculateEnhancedDelay(ltvSpeedKmh, designSpeedKmh, distanceKm) {
+    if (ltvSpeedKmh >= designSpeedKmh || ltvSpeedKmh <= 0) return 0;
+
+    const Vd = designSpeedKmh / 3.6; // m/s
+    const Vl = ltvSpeedKmh / 3.6;   // m/s
+    const distanceM = distanceKm * 1000;
+
+    // 1. Constant speed phase delay
+    // delay = dist / Vl - dist / Vd
+    const delayConstant = distanceM * (1 / Vl - 1 / Vd);
+
+    // 2. Deceleration phase delay (assuming constant 1 m/s^2)
+    // t_dec = (Vd - Vl) / a
+    // s_dec = (Vd^2 - Vl^2) / (2 * a)
+    // delay_dec = t_dec - (s_dec / Vd) = (Vd - Vl)^2 / (2 * a * Vd)
+    const aDec = 1.0;
+    const delayDec = Math.pow(Vd - Vl, 2) / (2 * aDec * Vd);
+
+    // 3. Acceleration phase delay (variable acceleration)
+    // Based on user provided reference points:
+    const accTable = [
+        { v: 0, a: 0.8 },
+        { v: 60, a: 0.75 },
+        { v: 100, a: 0.6 },
+        { v: 120, a: 0.5 },
+        { v: 160, a: 0.4 },
+        { v: 250, a: 0.25 },
+        { v: 400, a: 0.1 }
+    ];
+
+    function getAccForV(vKmh) {
+        for (let i = 0; i < accTable.length - 1; i++) {
+            if (vKmh >= accTable[i].v && vKmh <= accTable[i + 1].v) {
+                const t = (vKmh - accTable[i].v) / (accTable[i + 1].v - accTable[i].v);
+                return accTable[i].a + t * (accTable[i + 1].a - accTable[i].a);
+            }
+        }
+        return accTable[accTable.length - 1].a;
+    }
+
+    // Numerical integration for acceleration delay: integral from Vl to Vd of (1/a(v) * (1 - v/Vd)) dv
+    let delayAcc = 0;
+    const step = 0.5; // km/h
+    for (let v = ltvSpeedKmh; v < designSpeedKmh; v += step) {
+        const vMs = v / 3.6;
+        const a = getAccForV(v);
+        // delay_step = dt - d_theoretical = (dv/a) - (v*dt/Vd) = (dv/a) * (1 - v/Vd)
+        delayAcc += ((step / 3.6) / a) * (1 - vMs / Vd);
+    }
+
+    return Math.round((delayConstant + delayDec + delayAcc) * 10) / 10;
+}
+
+/**
  * Main geocoding function. Uses a two-phase approach:
  * 1. WFS-based geocoding using ADIF's PKTeoricos for precise railway coordinates
  * 2. Station-based fallback for entries that WFS couldn't resolve
  */
 async function geocode(ltvData) {
     console.log('Geocoding entries...');
+
+    const designSpeeds = await fetchDesignSpeeds();
 
     // Pre-load station map for disambiguation in Phase 1 and fallback in Phase 2
     const stationMap = new Map();
@@ -389,12 +484,32 @@ async function geocode(ltvData) {
                     record.latitude = (startCoords.lat + endCoords.lat) / 2;
                     record.longitude = (startCoords.lon + endCoords.lon) / 2;
                     record.geocodingMethod = 'wfs';
+                    if (designSpeeds.has(bestTramo.codtramo)) {
+                        record.designSpeed = designSpeeds.get(bestTramo.codtramo);
+                        // Calculate enhanced delay
+                        const ltvSpeedMatch = record.speed.match(/(\d+)/);
+                        if (ltvSpeedMatch && !isNaN(startKm) && !isNaN(endKm)) {
+                            const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
+                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(endKm - startKm));
+                        }
+                    }
                     wfsResolved++;
                 } else if (startCoords || endCoords) {
                     const c = startCoords || endCoords;
                     record.latitude = c.lat;
                     record.longitude = c.lon;
                     record.geocodingMethod = 'wfs';
+                    if (designSpeeds.has(bestTramo.codtramo)) {
+                        record.designSpeed = designSpeeds.get(bestTramo.codtramo);
+                        // Calculate enhanced delay
+                        const ltvSpeedMatch = record.speed.match(/(\d+)/);
+                        const sKm = parseFloat(record.startKm);
+                        const eKm = parseFloat(record.endKm);
+                        if (ltvSpeedMatch && !isNaN(sKm) && !isNaN(eKm)) {
+                            const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
+                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(eKm - sKm));
+                        }
+                    }
                     wfsResolved++;
                 } else {
                     wfsFailed++;
