@@ -21,3 +21,5 @@ temp_*
 inspect_pdf.js
 check_missing.js
 sample.pdf
+
+wfs/

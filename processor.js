@@ -10,8 +10,10 @@ const STATIONS_FILE = path.join(__dirname, 'stations.json');
 const LTV_JSON = path.join(OUTPUT_DIR, 'ltv.json');
 
 const WFS_BASE = 'https://ideadif.adif.es/gservices/Tramificacion/wfs';
+const WFS_CACHE_DIR = path.join(__dirname, 'wfs');
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR);
+if (!fs.existsSync(WFS_CACHE_DIR)) fs.mkdirSync(WFS_CACHE_DIR);
 
 function normalize(text) {
     if (!text) return '';
@@ -176,6 +178,13 @@ function findCoordsForPk(sortedPks, targetPk) {
  * it uses an internal coding. This function resolves the mapping.
  */
 async function fetchCodtramoPrefixes(lineNum) {
+    const cacheFile = path.join(WFS_CACHE_DIR, `prefixes_${lineNum}.json`);
+
+    // Check cache
+    if (fs.existsSync(cacheFile)) {
+        return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    }
+
     try {
         const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature` +
             `&typeName=Tramificacion:TramosServicio&outputFormat=application/json` +
@@ -192,7 +201,13 @@ async function fetchCodtramoPrefixes(lineNum) {
                 prefixes.add(f.properties.codtramo.substring(0, 5));
             }
         }
-        return Array.from(prefixes);
+
+        const result = Array.from(prefixes);
+
+        // Save to cache
+        fs.writeFileSync(cacheFile, JSON.stringify(result, null, 2));
+
+        return result;
     } catch (err) {
         console.warn(`  WFS TramosServicio query failed for line ${lineNum}: ${err.message}`);
         return [];
@@ -204,6 +219,13 @@ async function fetchCodtramoPrefixes(lineNum) {
  * Returns an array of { pk, lat, lon } sorted by pk.
  */
 async function fetchPKTeoricos(codtramoPrefix) {
+    const cacheFile = path.join(WFS_CACHE_DIR, `pks_${codtramoPrefix}.json`);
+
+    // Check cache
+    if (fs.existsSync(cacheFile)) {
+        return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    }
+
     try {
         const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature` +
             `&typeName=Tramificacion:PKTeoricos&outputFormat=application/json` +
@@ -213,7 +235,7 @@ async function fetchPKTeoricos(codtramoPrefix) {
         const data = response.data;
         if (!data.features || data.features.length === 0) return [];
 
-        return data.features
+        const result = data.features
             .filter(f => f.geometry && f.properties.pk != null)
             .map(f => ({
                 pk: f.properties.pk,
@@ -222,6 +244,11 @@ async function fetchPKTeoricos(codtramoPrefix) {
                 codtramo: f.properties.codtramo
             }))
             .sort((a, b) => a.pk - b.pk);
+
+        // Save to cache
+        fs.writeFileSync(cacheFile, JSON.stringify(result, null, 2));
+
+        return result;
     } catch (err) {
         console.warn(`  WFS PKTeoricos query failed for prefix ${codtramoPrefix}: ${err.message}`);
         return [];
@@ -235,6 +262,21 @@ async function fetchPKTeoricos(codtramoPrefix) {
  */
 async function geocode(ltvData) {
     console.log('Geocoding entries...');
+
+    // Pre-load station map for disambiguation in Phase 1 and fallback in Phase 2
+    const stationMap = new Map();
+    if (fs.existsSync(STATIONS_FILE)) {
+        const stationsData = JSON.parse(fs.readFileSync(STATIONS_FILE, 'utf8'));
+        for (const s of stationsData) {
+            if (s.DESCRIPCION && s.LATITUD && s.LONGITUD) {
+                const norm = normalize(s.DESCRIPCION);
+                if (norm.length > 0 && !stationMap.has(norm)) {
+                    stationMap.set(norm, { lat: s.LATITUD, lon: s.LONGITUD });
+                }
+            }
+        }
+    }
+    const stationList = Array.from(stationMap.entries()).map(([norm, coords]) => ({ norm, coords })).sort((a, b) => a.norm.length - b.norm.length);
 
     // ── Phase 1: WFS-based geocoding using ADIF PKTeoricos ──
     let wfsResolved = 0;
@@ -252,27 +294,28 @@ async function geocode(ltvData) {
         console.log(`  Found ${lineNumbers.size} unique line numbers`);
 
         // For each line, resolve codtramo prefixes and fetch PK data
-        const linePkCache = new Map(); // lineNum → sorted array of { pk, lat, lon }
+        const lineTramosCache = new Map(); // lineNum → Map(codtramo → sorted array of { pk, lat, lon })
         for (const lineNum of lineNumbers) {
             const prefixes = await fetchCodtramoPrefixes(lineNum);
-            if (prefixes.length === 0) {
-                console.log(`  Line ${lineNum}: no WFS tramos found`);
-                continue;
-            }
-            console.log(`  Line ${lineNum}: found ${prefixes.length} codtramo prefix(es): ${prefixes.join(', ')}`);
+            if (prefixes.length === 0) continue;
 
-            // Fetch PKTeoricos for all prefixes of this line
-            let allPks = [];
+            const tramosMap = new Map();
             for (const prefix of prefixes) {
-                const pks = await fetchPKTeoricos(prefix);
-                allPks = allPks.concat(pks);
+                const allPksForPrefix = await fetchPKTeoricos(prefix);
+                // Group by full 9-digit codtramo to handle mileage resets
+                for (const p of allPksForPrefix) {
+                    if (!tramosMap.has(p.codtramo)) tramosMap.set(p.codtramo, []);
+                    tramosMap.get(p.codtramo).push(p);
+                }
             }
 
-            // Sort by pk and deduplicate
-            allPks.sort((a, b) => a.pk - b.pk);
-            if (allPks.length > 0) {
-                linePkCache.set(lineNum, allPks);
-                console.log(`  Line ${lineNum}: loaded ${allPks.length} PK points (range ${allPks[0].pk} - ${allPks[allPks.length - 1].pk})`);
+            // Sort individual tramos and store
+            for (const [ct, pks] of tramosMap.entries()) {
+                pks.sort((a, b) => a.pk - b.pk);
+            }
+            if (tramosMap.size > 0) {
+                lineTramosCache.set(lineNum, tramosMap);
+                console.log(`  Line ${lineNum}: loaded ${tramosMap.size} segments (tramos)`);
             }
         }
 
@@ -281,32 +324,77 @@ async function geocode(ltvData) {
             const match = lineName.match(/LÍNEA\s+(\d{3})/);
             if (!match) continue;
             const lineNum = match[1];
-            const pks = linePkCache.get(lineNum);
-            if (!pks || pks.length === 0) continue;
+            const lineTramos = lineTramosCache.get(lineNum);
+            if (!lineTramos) continue;
 
             for (const record of ltvData[lineName]) {
                 const startKm = parseFloat(record.startKm);
                 const endKm = parseFloat(record.endKm);
                 if (isNaN(startKm) && isNaN(endKm)) continue;
 
-                const validStart = !isNaN(startKm);
-                const validEnd = !isNaN(endKm);
+                const targetPk = isNaN(startKm) ? endKm : startKm;
 
-                const startCoords = validStart ? findCoordsForPk(pks, startKm) : null;
-                const endCoords = validEnd ? findCoordsForPk(pks, endKm) : null;
+                // Identify candidates tramos that contain the target PK
+                const candidates = [];
+                for (const [ct, pks] of lineTramos.entries()) {
+                    if (pks.length === 0) continue;
+                    if (targetPk >= pks[0].pk && targetPk <= pks[pks.length - 1].pk) {
+                        candidates.push({ codtramo: ct, pks: pks });
+                    }
+                }
+
+                if (candidates.length === 0) {
+                    wfsFailed++;
+                    continue;
+                }
+
+                let bestTramo = candidates[0];
+
+                // If we have mileage resets (multiple candidates), disambiguate using station proximity
+                if (candidates.length > 1) {
+                    const recordStations = record.stations.split(/[-\s]+/).filter(s => s.length > 2);
+                    let refCoords = null;
+                    for (const st of recordStations) {
+                        const normSt = normalize(st);
+                        if (stationMap.has(normSt)) {
+                            refCoords = stationMap.get(normSt);
+                            break;
+                        }
+                        // Try partial match if exact match fails
+                        const partialMatch = stationList.find(s => s.norm.includes(normSt) || normSt.includes(s.norm));
+                        if (partialMatch) {
+                            refCoords = partialMatch.coords;
+                            break;
+                        }
+                    }
+
+                    if (refCoords) {
+                        let minDistance = Infinity;
+                        for (const cand of candidates) {
+                            const midIdx = Math.floor(cand.pks.length / 2);
+                            const sample = cand.pks[midIdx];
+                            const dist = Math.sqrt(Math.pow(sample.lat - refCoords.lat, 2) + Math.pow(sample.lon - refCoords.lon, 2));
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                bestTramo = cand;
+                            }
+                        }
+                    }
+                }
+
+                const startCoords = !isNaN(startKm) ? findCoordsForPk(bestTramo.pks, startKm) : null;
+                const endCoords = !isNaN(endKm) ? findCoordsForPk(bestTramo.pks, endKm) : null;
 
                 if (startCoords && endCoords) {
-                    // Use midpoint between start and end
                     record.latitude = (startCoords.lat + endCoords.lat) / 2;
                     record.longitude = (startCoords.lon + endCoords.lon) / 2;
+                    record.geocodingMethod = 'wfs';
                     wfsResolved++;
-                } else if (startCoords) {
-                    record.latitude = startCoords.lat;
-                    record.longitude = startCoords.lon;
-                    wfsResolved++;
-                } else if (endCoords) {
-                    record.latitude = endCoords.lat;
-                    record.longitude = endCoords.lon;
+                } else if (startCoords || endCoords) {
+                    const c = startCoords || endCoords;
+                    record.latitude = c.lat;
+                    record.longitude = c.lon;
+                    record.geocodingMethod = 'wfs';
                     wfsResolved++;
                 } else {
                     wfsFailed++;
@@ -320,26 +408,9 @@ async function geocode(ltvData) {
 
     // ── Phase 2: Station-based fallback for unresolved entries ──
     console.log('  Phase 2: Station-based fallback for remaining entries...');
-    if (!fs.existsSync(STATIONS_FILE)) {
-        console.warn('  stations.json not found, skipping station fallback');
-        return ltvData;
-    }
-    const stationsData = JSON.parse(fs.readFileSync(STATIONS_FILE, 'utf8'));
-    const stationMap = new Map();
-    for (const s of stationsData) {
-        if (s.DESCRIPCION && s.LATITUD && s.LONGITUD) {
-            const norm = normalize(s.DESCRIPCION);
-            if (norm.length > 0 && !stationMap.has(norm)) {
-                stationMap.set(norm, { lat: s.LATITUD, lon: s.LONGITUD });
-            }
-        }
-    }
-    const stationList = Array.from(stationMap.entries()).map(([norm, coords]) => ({ norm, coords })).sort((a, b) => a.norm.length - b.norm.length);
-
     let stationResolved = 0;
     for (const lineName in ltvData) {
         for (const record of ltvData[lineName]) {
-            // Skip entries already resolved by WFS
             if (record.latitude && record.longitude) continue;
 
             const parts = record.stations.split(/-\s+|\s+-/);
@@ -370,6 +441,7 @@ async function geocode(ltvData) {
                 const avgLon = coords.reduce((sum, c) => sum + c.lon, 0) / coords.length;
                 record.latitude = avgLat;
                 record.longitude = avgLon;
+                record.geocodingMethod = 'station';
                 stationResolved++;
             }
         }
