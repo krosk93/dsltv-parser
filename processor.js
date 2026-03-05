@@ -3,6 +3,7 @@ const path = require('path');
 const { PDFParse } = require('pdf-parse');
 const turf = require('@turf/turf');
 const axios = require('axios');
+const crypto = require('crypto');
 
 const PDF_DIR = path.join(__dirname, 'pdfs');
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -43,6 +44,17 @@ function formatDateTime(date, time) {
     if (!t) return d;
     if (!d) return t;
     return `${d} ${t}`;
+}
+
+function hashCode(code) {
+    if (!code) return '';
+    const codeStr = code.toString().trim();
+    // SHA256 in base64 is 44 characters and ends with '='.
+    // LTV codes are 9-digit numbers like "000123456".
+    if (codeStr.length === 44 && codeStr.endsWith('=') && !/^\d+$/.test(codeStr)) {
+        return codeStr;
+    }
+    return crypto.createHash('sha256').update(codeStr).digest('base64');
 }
 
 async function extractVigorDate(filePath) {
@@ -113,7 +125,7 @@ async function parseSinglePdf(filePath) {
                 if (codeMatch) {
                     records.push({
                         line: currentLine,
-                        code: codeMatch[1],
+                        code: hashCode(codeMatch[1]),
                         stations: clean(row[1]),
                         track: clean(row[2]),
                         startKm: clean(row[3]),
@@ -664,6 +676,19 @@ async function reprocess() {
     for (const file of files) {
         console.log(`Parsing ${file.name}...`);
         const records = JSON.parse(fs.readFileSync(file.path, 'utf8'));
+        let migrationNeeded = false;
+        for (let i = 0; i < records.length; i++) {
+            const rec = records[i];
+            // Check if code is in the old (9 digits) format
+            if (rec.code && /^\d{9}$/.test(rec.code)) {
+                rec.code = hashCode(rec.code);
+                migrationNeeded = true;
+            }
+        }
+        if (migrationNeeded) {
+            fs.writeFileSync(file.path, JSON.stringify(records, null, 2));
+        }
+
         for (const rec of records) {
             if (!globalLtvMap.has(rec.code)) {
                 const { line, ...rest } = rec;
