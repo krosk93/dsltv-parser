@@ -104,8 +104,10 @@ async function parseSinglePdf(filePath) {
             let tableRows = [];
             try {
                 const tableResult = await parser.getTable({ partial: [i] });
-                if (tableResult.pages && tableResult.pages[0] && tableResult.pages[0].tables) {
+                if (tableResult.pages && tableResult.pages[0] && tableResult.pages[0].tables && tableResult.pages[0].tables.length > 0) {
                     tableRows = tableResult.pages[0].tables[0];
+                } else {
+                    tableRows = [];
                 }
             } catch (err) {
                 continue;

@@ -53,7 +53,7 @@ bot.on('document', async (msg) => {
         // Extract date
         const vigorDate = await extractVigorDate(tempPath);
         if (!vigorDate) {
-            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un DSLTV vàlid. Si us plau, verifica-ho.');
+            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un document de LTV vàlid. Si us plau, verifica-ho.');
             fs.unlinkSync(tempPath);
             return;
         }
@@ -73,7 +73,7 @@ bot.on('document', async (msg) => {
         const parsedData = await parseSinglePdf(tempPath);
 
         if (parsedData.length === 0) {
-            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un DSLTV vàlid. Si us plau, verifica-ho.');
+            bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un document de LTV vàlid. Si us plau, verifica-ho.');
             fs.unlinkSync(tempPath);
             return;
         }
@@ -91,7 +91,17 @@ bot.on('document', async (msg) => {
 });
 
 bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, 'Benvingut! Pots enviar-me PDFs de DSLTV i els processaré automàticament. Un cop processat, esborraré el PDF.');
+    const chatId = msg.chat.id;
+    const welcomeMsg = 'Benvingut! Pots enviar-me PDFs de LTV i els processaré automàticament. Un cop processat, esborraré el PDF.';
+    const filePath = path.join(__dirname, 'plantilla_semanal.pdf');
+
+    bot.sendMessage(chatId, welcomeMsg).then(() => {
+        if (fs.existsSync(filePath)) {
+            bot.sendDocument(chatId, filePath, {
+                caption: 'S\'admeten fitxers amb aquest format (veure plantilla).'
+            });
+        }
+    });
 });
 
 (async function () {

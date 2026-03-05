@@ -19,6 +19,7 @@ COPY --from=builder /app/processor.js ./
 COPY --from=builder /app/stations.json ./
 COPY --from=builder /app/communities.geojson ./
 COPY --from=builder /app/provinces.geojson ./
+COPY --from=builder /app/plantilla_semanal.pdf ./
 
 RUN addgroup -g 1001 nodejs && \
     adduser -S botuser -u 1001 -G nodejs
