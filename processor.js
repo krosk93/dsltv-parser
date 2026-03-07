@@ -150,52 +150,80 @@ async function parseSinglePdf(filePath) {
 }
 
 /**
- * Interpolates coordinates between two PK points based on a target PK value.
- * If the target falls between pkA and pkB, linearly interpolates lat/lon.
+ * Extracts a single LineString from a geometry (LineString or MultiLineString).
  */
-function interpolateCoords(pkA, pkB, targetPk) {
-    if (pkA.pk === pkB.pk) return { lat: pkA.lat, lon: pkA.lon };
-    const t = (targetPk - pkA.pk) / (pkB.pk - pkA.pk);
+function extractLineString(geometry) {
+    if (!geometry) return null;
+    if (geometry.type === 'LineString') return geometry;
+    if (geometry.type === 'MultiLineString') {
+        const coords = [];
+        for (const line of geometry.coordinates) {
+            coords.push(...line);
+        }
+        return { type: 'LineString', coordinates: coords };
+    }
+    return null;
+}
+
+/**
+ * Finds coordinates for a target PK on a specific tramo geometry.
+ */
+function findCoordsOnTramo(tramo, targetPk) {
+    const line = extractLineString(tramo.geometry);
+    if (!line) return null;
+
+    // Calculate length if not already cached
+    const length = turf.length(line);
+
+    const range = tramo.pkd - tramo.pki;
+    if (Math.abs(range) < 0.0001) {
+        return { lon: line.coordinates[0][0], lat: line.coordinates[0][1] };
+    }
+
+    let ratio = (targetPk - tramo.pki) / range;
+    ratio = Math.max(0, Math.min(1, ratio));
+
+    const point = turf.along(line, ratio * length);
     return {
-        lat: pkA.lat + t * (pkB.lat - pkA.lat),
-        lon: pkA.lon + t * (pkB.lon - pkA.lon)
+        lon: point.geometry.coordinates[0],
+        lat: point.geometry.coordinates[1]
     };
 }
 
 /**
- * Finds the best coordinate for a given PK value from a sorted array of PK points.
- * Interpolates between the two nearest PKs if the target falls between them,
- * or returns the nearest PK if outside range.
+ * Slices a tramo geometry between two PKs.
  */
-function findCoordsForPk(sortedPks, targetPk) {
-    if (sortedPks.length === 0) return null;
-    if (sortedPks.length === 1) return { lat: sortedPks[0].lat, lon: sortedPks[0].lon };
+function sliceTramoByPk(tramo, startPk, endPk) {
+    const line = extractLineString(tramo.geometry);
+    if (!line) return [];
 
-    // Find the two surrounding PKs for interpolation
-    for (let i = 0; i < sortedPks.length - 1; i++) {
-        if (targetPk >= sortedPks[i].pk && targetPk <= sortedPks[i + 1].pk) {
-            return interpolateCoords(sortedPks[i], sortedPks[i + 1], targetPk);
-        }
-    }
+    const length = turf.length(line);
+    const range = tramo.pkd - tramo.pki;
+    if (Math.abs(range) < 0.0001) return [[line.coordinates[0][0], line.coordinates[0][1]]];
 
-    // Target PK is outside the range: use nearest PK
-    const first = sortedPks[0];
-    const last = sortedPks[sortedPks.length - 1];
-    if (Math.abs(targetPk - first.pk) <= Math.abs(targetPk - last.pk)) {
-        return { lat: first.lat, lon: first.lon };
+    const p1 = Math.max(0, Math.min(1, (startPk - tramo.pki) / range)) * length;
+    const p2 = Math.max(0, Math.min(1, (endPk - tramo.pki) / range)) * length;
+
+    const startDist = Math.min(p1, p2);
+    const endDist = Math.max(p1, p2);
+
+    try {
+        const sliced = turf.lineSliceAlong(line, startDist, endDist);
+        let coords = sliced.geometry.coordinates;
+        // Reverse if needed to match startPk -> endPk direction
+        if (p1 > p2) coords.reverse();
+        return coords;
+    } catch (e) {
+        return [[line.coordinates[0][0], line.coordinates[0][1]]];
     }
-    return { lat: last.lat, lon: last.lon };
 }
 
 /**
- * Fetches codtramo prefixes for a given line number from the WFS TramosServicio layer.
- * The codtramo in ADIF WFS does not directly correspond to the LÍNEA number —
- * it uses an internal coding. This function resolves the mapping.
+ * Fetches all TramosServicio for a given line number with full geometry.
  */
-async function fetchCodtramoPrefixes(lineNum) {
-    const cacheFile = path.join(WFS_CACHE_DIR, `prefixes_${lineNum}.json`);
+async function fetchLineTramos(lineNum) {
+    const cacheFile = path.join(WFS_CACHE_DIR, `tramos_${lineNum}.json`);
 
-    // Check cache
     if (fs.existsSync(cacheFile)) {
         return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
     }
@@ -203,28 +231,33 @@ async function fetchCodtramoPrefixes(lineNum) {
     try {
         const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature` +
             `&typeName=Tramificacion:TramosServicio&outputFormat=application/json` +
-            `&propertyName=codtramo,cod_linea` +
-            `&CQL_FILTER=cod_linea LIKE '${lineNum} %25'`;
-        const response = await axios.get(url, { timeout: 15000 });
+            `&srsName=EPSG:4326` +
+            `&CQL_FILTER=cod_linea LIKE '${lineNum}%25'`;
+        const response = await axios.get(url, { timeout: 30000 });
         const data = response.data;
         if (!data.features || data.features.length === 0) return [];
 
-        // Extract the unique 5-char codtramo prefixes (e.g. "01100" from "011000010")
-        const prefixes = new Set();
-        for (const f of data.features) {
-            if (f.properties.codtramo) {
-                prefixes.add(f.properties.codtramo.substring(0, 5));
-            }
-        }
+        // Exact filter: ensures '210' doesn't match '2100'
+        // Matches lineNum strictly followed by a non-digit or end of string
+        const tramos = data.features
+            .filter(f => {
+                const cl = f.properties.cod_linea;
+                if (!cl) return false;
+                const match = cl.match(/^(\d+)/);
+                return match && match[1] === lineNum;
+            })
+            .map(f => ({
+                codtramo: f.properties.codtramo,
+                pki: f.properties.pki,
+                pkd: f.properties.pkd,
+                geometry: f.geometry,
+                orden: f.properties.orden
+            }));
 
-        const result = Array.from(prefixes);
-
-        // Save to cache
-        fs.writeFileSync(cacheFile, JSON.stringify(result, null, 2));
-
-        return result;
+        fs.writeFileSync(cacheFile, JSON.stringify(tramos, null, 2));
+        return tramos;
     } catch (err) {
-        console.warn(`  WFS TramosServicio query failed for line ${lineNum}: ${err.message}`);
+        console.warn(`  WFS fetchLineTramos failed for line ${lineNum}: ${err.message}`);
         return [];
     }
 }
@@ -402,29 +435,13 @@ async function geocode(ltvData) {
         }
         console.log(`  Found ${lineNumbers.size} unique line numbers`);
 
-        // For each line, resolve codtramo prefixes and fetch PK data
-        const lineTramosCache = new Map(); // lineNum → Map(codtramo → sorted array of { pk, lat, lon })
+        // For each line, resolve tramos with geometry
+        const lineTramosCache = new Map(); // lineNum → Array of Tramos
         for (const lineNum of lineNumbers) {
-            const prefixes = await fetchCodtramoPrefixes(lineNum);
-            if (prefixes.length === 0) continue;
-
-            const tramosMap = new Map();
-            for (const prefix of prefixes) {
-                const allPksForPrefix = await fetchPKTeoricos(prefix);
-                // Group by full 9-digit codtramo to handle mileage resets
-                for (const p of allPksForPrefix) {
-                    if (!tramosMap.has(p.codtramo)) tramosMap.set(p.codtramo, []);
-                    tramosMap.get(p.codtramo).push(p);
-                }
-            }
-
-            // Sort individual tramos and store
-            for (const [ct, pks] of tramosMap.entries()) {
-                pks.sort((a, b) => a.pk - b.pk);
-            }
-            if (tramosMap.size > 0) {
-                lineTramosCache.set(lineNum, tramosMap);
-                console.log(`  Line ${lineNum}: loaded ${tramosMap.size} segments (tramos)`);
+            const tramos = await fetchLineTramos(lineNum);
+            if (tramos.length > 0) {
+                lineTramosCache.set(lineNum, tramos);
+                console.log(`  Line ${lineNum}: loaded ${tramos.length} segments with geometry`);
             }
         }
 
@@ -433,24 +450,23 @@ async function geocode(ltvData) {
             const match = lineName.match(/LÍNEA\s+(\d{3})/);
             if (!match) continue;
             const lineNum = match[1];
-            const lineTramos = lineTramosCache.get(lineNum);
-            if (!lineTramos) continue;
+            const allTramos = lineTramosCache.get(lineNum);
+            if (!allTramos) continue;
 
             for (const record of ltvData[lineName]) {
                 const startKm = parseFloat(record.startKm);
                 const endKm = parseFloat(record.endKm);
-                if (isNaN(startKm) && isNaN(endKm)) continue;
+                if (isNaN(startKm)) continue;
 
-                const targetPk = isNaN(startKm) ? endKm : startKm;
+                // PK Tolerance: allow matching tramos within 1km gap to handle edge cases/discrepancies
+                const TOLERANCE = 1.0;
 
-                // Identify candidates tramos that contain the target PK
-                const candidates = [];
-                for (const [ct, pks] of lineTramos.entries()) {
-                    if (pks.length === 0) continue;
-                    if (targetPk >= pks[0].pk && targetPk <= pks[pks.length - 1].pk) {
-                        candidates.push({ codtramo: ct, pks: pks });
-                    }
-                }
+                // Identify tramos that might contain the PK range (with tolerance)
+                const candidates = allTramos.filter(t => {
+                    const minT = Math.min(t.pki, t.pkd);
+                    const maxT = Math.max(t.pki, t.pkd);
+                    return (startKm >= minT - TOLERANCE) && (startKm <= maxT + TOLERANCE);
+                });
 
                 if (candidates.length === 0) {
                     wfsFailed++;
@@ -459,7 +475,7 @@ async function geocode(ltvData) {
 
                 let bestTramo = candidates[0];
 
-                // If we have mileage resets (multiple candidates), disambiguate using station proximity
+                // Disambiguate if multiple candidates (e.g. parallel tracks or resets)
                 if (candidates.length > 1) {
                     const recordStations = record.stations.split(/[-\s]+/).filter(s => s.length > 2);
                     let refCoords = null;
@@ -469,59 +485,47 @@ async function geocode(ltvData) {
                             refCoords = stationMap.get(normSt);
                             break;
                         }
-                        // Try partial match if exact match fails
-                        const partialMatch = stationList.find(s => s.norm.includes(normSt) || normSt.includes(s.norm));
-                        if (partialMatch) {
-                            refCoords = partialMatch.coords;
-                            break;
-                        }
                     }
 
                     if (refCoords) {
                         let minDistance = Infinity;
                         for (const cand of candidates) {
-                            const midIdx = Math.floor(cand.pks.length / 2);
-                            const sample = cand.pks[midIdx];
-                            const dist = Math.sqrt(Math.pow(sample.lat - refCoords.lat, 2) + Math.pow(sample.lon - refCoords.lon, 2));
-                            if (dist < minDistance) {
-                                minDistance = dist;
-                                bestTramo = cand;
+                            const coords = findCoordsOnTramo(cand, startKm);
+                            if (coords) {
+                                const dist = Math.sqrt(Math.pow(coords.lat - refCoords.lat, 2) + Math.pow(coords.lon - refCoords.lon, 2));
+                                if (dist < minDistance) {
+                                    minDistance = dist;
+                                    bestTramo = cand;
+                                }
                             }
                         }
                     }
                 }
 
-                const startCoords = !isNaN(startKm) ? findCoordsForPk(bestTramo.pks, startKm) : null;
-                const endCoords = !isNaN(endKm) ? findCoordsForPk(bestTramo.pks, endKm) : null;
+                // Now use the best tramo to get precise coordinates
+                const startCoords = findCoordsOnTramo(bestTramo, startKm);
+                const endCoords = !isNaN(endKm) ? findCoordsOnTramo(bestTramo, endKm) : null;
 
-                if (startCoords && endCoords) {
-                    record.latitude = (startCoords.lat + endCoords.lat) / 2;
-                    record.longitude = (startCoords.lon + endCoords.lon) / 2;
+                if (startCoords) {
+                    if (endCoords) {
+                        const midPk = (startKm + endKm) / 2;
+                        const midCoords = findCoordsOnTramo(bestTramo, midPk);
+                        record.latitude = midCoords.lat;
+                        record.longitude = midCoords.lon;
+                        record.path = sliceTramoByPk(bestTramo, startKm, endKm);
+                    } else {
+                        record.latitude = startCoords.lat;
+                        record.longitude = startCoords.lon;
+                        record.path = [[startCoords.lon, startCoords.lat]];
+                    }
+
                     record.geocodingMethod = 'wfs';
                     if (designSpeeds.has(bestTramo.codtramo)) {
                         record.designSpeed = designSpeeds.get(bestTramo.codtramo);
-                        // Calculate enhanced delay
                         const ltvSpeedMatch = record.speed.match(/(\d+)/);
-                        if (ltvSpeedMatch && !isNaN(startKm) && !isNaN(endKm)) {
+                        if (ltvSpeedMatch && !isNaN(endKm)) {
                             const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
                             record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(endKm - startKm));
-                        }
-                    }
-                    wfsResolved++;
-                } else if (startCoords || endCoords) {
-                    const c = startCoords || endCoords;
-                    record.latitude = c.lat;
-                    record.longitude = c.lon;
-                    record.geocodingMethod = 'wfs';
-                    if (designSpeeds.has(bestTramo.codtramo)) {
-                        record.designSpeed = designSpeeds.get(bestTramo.codtramo);
-                        // Calculate enhanced delay
-                        const ltvSpeedMatch = record.speed.match(/(\d+)/);
-                        const sKm = parseFloat(record.startKm);
-                        const eKm = parseFloat(record.endKm);
-                        if (ltvSpeedMatch && !isNaN(sKm) && !isNaN(eKm)) {
-                            const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
-                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(eKm - sKm));
                         }
                     }
                     wfsResolved++;
