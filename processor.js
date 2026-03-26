@@ -342,7 +342,7 @@ async function fetchDesignSpeeds() {
  * Calculates the extra time (delay) in seconds for a speed limitation,
  * including deceleration and acceleration phases.
  */
-function calculateEnhancedDelay(ltvSpeedKmh, designSpeedKmh, distanceKm) {
+function calculateEnhancedDelay(ltvSpeedKmh, designSpeedKmh, distanceKm, isAv = false) {
     if (ltvSpeedKmh >= designSpeedKmh || ltvSpeedKmh <= 0) return 0;
 
     const Vd = designSpeedKmh / 3.6; // m/s
@@ -350,46 +350,49 @@ function calculateEnhancedDelay(ltvSpeedKmh, designSpeedKmh, distanceKm) {
     const distanceM = distanceKm * 1000;
 
     // 1. Constant speed phase delay
-    // delay = dist / Vl - dist / Vd
     const delayConstant = distanceM * (1 / Vl - 1 / Vd);
 
-    // 2. Deceleration phase delay (assuming constant 1 m/s^2)
-    // t_dec = (Vd - Vl) / a
-    // s_dec = (Vd^2 - Vl^2) / (2 * a)
-    // delay_dec = t_dec - (s_dec / Vd) = (Vd - Vl)^2 / (2 * a * Vd)
-    const aDec = 1.0;
+    // 2. Deceleration phase delay
+    let aDec = 1.0;
+    if (isAv) {
+        // v^2 = u^2 + 2ad -> 0 = (320/3.6)^2 - 2 * a * 8000 -> a = (320/3.6)^2 / 16000
+        aDec = Math.pow(320 / 3.6, 2) / 16000;
+    }
     const delayDec = Math.pow(Vd - Vl, 2) / (2 * aDec * Vd);
 
-    // 3. Acceleration phase delay (variable acceleration)
-    // Based on user provided reference points:
-    const accTable = [
-        { v: 0, a: 0.8 },
-        { v: 60, a: 0.75 },
-        { v: 100, a: 0.6 },
-        { v: 120, a: 0.5 },
-        { v: 160, a: 0.4 },
-        { v: 250, a: 0.25 },
-        { v: 400, a: 0.1 }
-    ];
-
-    function getAccForV(vKmh) {
-        for (let i = 0; i < accTable.length - 1; i++) {
-            if (vKmh >= accTable[i].v && vKmh <= accTable[i + 1].v) {
-                const t = (vKmh - accTable[i].v) / (accTable[i + 1].v - accTable[i].v);
-                return accTable[i].a + t * (accTable[i + 1].a - accTable[i].a);
-            }
-        }
-        return accTable[accTable.length - 1].a;
-    }
-
-    // Numerical integration for acceleration delay: integral from Vl to Vd of (1/a(v) * (1 - v/Vd)) dv
+    // 3. Acceleration phase delay
     let delayAcc = 0;
-    const step = 0.5; // km/h
-    for (let v = ltvSpeedKmh; v < designSpeedKmh; v += step) {
-        const vMs = v / 3.6;
-        const a = getAccForV(v);
-        // delay_step = dt - d_theoretical = (dv/a) - (v*dt/Vd) = (dv/a) * (1 - v/Vd)
-        delayAcc += ((step / 3.6) / a) * (1 - vMs / Vd);
+    if (isAv) {
+        // a = v / t -> (320 / 3.6) / 450
+        const aAcc = (320 / 3.6) / 450;
+        delayAcc = Math.pow(Vd - Vl, 2) / (2 * aAcc * Vd);
+    } else {
+        const accTable = [
+            { v: 0, a: 0.8 },
+            { v: 60, a: 0.75 },
+            { v: 100, a: 0.6 },
+            { v: 120, a: 0.5 },
+            { v: 160, a: 0.4 },
+            { v: 250, a: 0.25 },
+            { v: 400, a: 0.1 }
+        ];
+
+        function getAccForV(vKmh) {
+            for (let i = 0; i < accTable.length - 1; i++) {
+                if (vKmh >= accTable[i].v && vKmh <= accTable[i + 1].v) {
+                    const t = (vKmh - accTable[i].v) / (accTable[i + 1].v - accTable[i].v);
+                    return accTable[i].a + t * (accTable[i + 1].a - accTable[i].a);
+                }
+            }
+            return accTable[accTable.length - 1].a;
+        }
+
+        const step = 0.5; // km/h
+        for (let v = ltvSpeedKmh; v < designSpeedKmh; v += step) {
+            const vMs = v / 3.6;
+            const a = getAccForV(v);
+            delayAcc += ((step / 3.6) / a) * (1 - vMs / Vd);
+        }
     }
 
     return Math.round((delayConstant + delayDec + delayAcc) * 10) / 10;
@@ -400,7 +403,7 @@ function calculateEnhancedDelay(ltvSpeedKmh, designSpeedKmh, distanceKm) {
  * 1. WFS-based geocoding using ADIF's PKTeoricos for precise railway coordinates
  * 2. Station-based fallback for entries that WFS couldn't resolve
  */
-async function geocode(ltvData) {
+async function geocode(ltvData, isAv = false) {
     console.log('Geocoding entries...');
 
     const designSpeeds = await fetchDesignSpeeds();
@@ -525,7 +528,7 @@ async function geocode(ltvData) {
                         const ltvSpeedMatch = record.speed.match(/(\d+)/);
                         if (ltvSpeedMatch && !isNaN(endKm)) {
                             const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
-                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(endKm - startKm));
+                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(endKm - startKm), isAv);
                         }
                     }
                     wfsResolved++;
@@ -664,10 +667,9 @@ async function convertToJson() {
     }
 }
 
-async function reprocess() {
-    console.log('Reprocessing all JSONs...');
+async function processFilesBySuffix(suffix, outputPath) {
     const files = fs.readdirSync(PDF_DIR)
-        .filter(f => f.toLowerCase().endsWith('_dsltv.json'))
+        .filter(f => f.toLowerCase().endsWith(suffix))
         .map(f => {
             const dateMatch = f.match(/^(\d{4})(\d{2})(\d{2})/);
             return {
@@ -721,12 +723,25 @@ async function reprocess() {
     const sortedGrouped = {};
     Object.keys(grouped).sort().forEach(key => { sortedGrouped[key] = grouped[key]; });
 
-    let enriched = await geocode(sortedGrouped);
+    let enriched = await geocode(sortedGrouped, suffix.includes('_dhltv'));
     enriched = await reverseGeocode(enriched);
 
-    fs.writeFileSync(LTV_JSON, JSON.stringify(enriched, null, 2));
-    console.log('Regeneration complete.');
+    fs.writeFileSync(outputPath, JSON.stringify(enriched, null, 2));
+    console.log(`Regeneration complete for ${suffix}.`);
     return enriched;
+}
+
+async function reprocess() {
+    console.log('Reprocessing all JSONs...');
+    
+    console.log('--- Processing DSLTV ---');
+    const ltv = await processFilesBySuffix('_dsltv.json', LTV_JSON);
+    
+    console.log('--- Processing DHLTV ---');
+    const LTV_AV_JSON = path.join(OUTPUT_DIR, 'ltv_av.json');
+    const av = await processFilesBySuffix('_dhltv.json', LTV_AV_JSON);
+    
+    return { ltv, av };
 }
 
 module.exports = { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR, isWeekly };
