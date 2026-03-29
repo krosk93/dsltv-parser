@@ -461,14 +461,17 @@ async function geocode(ltvData, isAv = false) {
                 const endKm = parseFloat(record.endKm);
                 if (isNaN(startKm)) continue;
 
-                // PK Tolerance: allow matching tramos within 1km gap to handle edge cases/discrepancies
+                const minPk = Math.min(startKm, isNaN(endKm) ? startKm : endKm);
+                const maxPk = Math.max(startKm, isNaN(endKm) ? startKm : endKm);
+
+                // PK Tolerance: allow matching tramos within 1km gap
                 const TOLERANCE = 1.0;
 
-                // Identify tramos that might contain the PK range (with tolerance)
-                const candidates = allTramos.filter(t => {
+                // Identify ALL tramos that overlap the PK range
+                let candidates = allTramos.filter(t => {
                     const minT = Math.min(t.pki, t.pkd);
                     const maxT = Math.max(t.pki, t.pkd);
-                    return (startKm >= minT - TOLERANCE) && (startKm <= maxT + TOLERANCE);
+                    return (maxPk >= minT - TOLERANCE) && (minPk <= maxT + TOLERANCE);
                 });
 
                 if (candidates.length === 0) {
@@ -476,9 +479,8 @@ async function geocode(ltvData, isAv = false) {
                     continue;
                 }
 
-                let bestTramo = candidates[0];
-
-                // Disambiguate if multiple candidates (e.g. parallel tracks or resets)
+                // Disambiguate parallel tracks if needed (using station names)
+                // Filter candidates to stay on the same "track" (codtramo suffix often helps)
                 if (candidates.length > 1) {
                     const recordStations = record.stations.split(/[-\s]+/).filter(s => s.length > 2);
                     let refCoords = null;
@@ -491,45 +493,104 @@ async function geocode(ltvData, isAv = false) {
                     }
 
                     if (refCoords) {
-                        let minDistance = Infinity;
-                        for (const cand of candidates) {
-                            const coords = findCoordsOnTramo(cand, startKm);
-                            if (coords) {
-                                const dist = Math.sqrt(Math.pow(coords.lat - refCoords.lat, 2) + Math.pow(coords.lon - refCoords.lon, 2));
-                                if (dist < minDistance) {
-                                    minDistance = dist;
-                                    bestTramo = cand;
+                        // Filter candidates that are reasonably close to the reference stations
+                        // or just pick the best start tramo and follow its pattern
+                        let startCandidates = candidates.filter(t => {
+                            const minT = Math.min(t.pki, t.pkd);
+                            const maxT = Math.max(t.pki, t.pkd);
+                            return (startKm >= minT - TOLERANCE) && (startKm <= maxT + TOLERANCE);
+                        });
+
+                        if (startCandidates.length > 1) {
+                            let minDistance = Infinity;
+                            let bestStart = startCandidates[0];
+                            for (const cand of startCandidates) {
+                                const coords = findCoordsOnTramo(cand, startKm);
+                                if (coords) {
+                                    const dist = Math.sqrt(Math.pow(coords.lat - refCoords.lat, 2) + Math.pow(coords.lon - refCoords.lon, 2));
+                                    if (dist < minDistance) {
+                                        minDistance = dist;
+                                        bestStart = cand;
+                                    }
+                                }
+                            }
+                            // Keep only candidates that match the start tram's track (suffix/codtramo)
+                            const startPrefix = bestStart.codtramo.substring(0, 7);
+                            candidates = candidates.filter(t => t.codtramo.startsWith(startPrefix));
+                        }
+                    }
+                }
+
+                // Sort candidates in order from startKm to endKm
+                candidates.sort((a, b) => {
+                    const midA = (a.pki + a.pkd) / 2;
+                    const midB = (b.pki + b.pkd) / 2;
+                    return startKm < endKm ? midA - midB : midB - midA;
+                });
+
+                let totalPath = [];
+                let totalDelay = 0;
+                let minDesignSpeed = Infinity;
+                let firstCoords = null;
+                let lastCoords = null;
+
+                for (const tramo of candidates) {
+                    const tramoPath = sliceTramoByPk(tramo, startKm, isNaN(endKm) ? startKm : endKm);
+                    if (tramoPath.length > 0) {
+                        // If appending, check for duplicates at the junction
+                        if (totalPath.length > 0 && tramoPath.length > 0) {
+                            const lastPoint = totalPath[totalPath.length - 1];
+                            const firstPoint = tramoPath[0];
+                            if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
+                                totalPath.push(...tramoPath.slice(1));
+                            } else {
+                                totalPath.push(...tramoPath);
+                            }
+                        } else {
+                            totalPath.push(...tramoPath);
+                        }
+
+                        if (!firstCoords) firstCoords = { lon: tramoPath[0][0], lat: tramoPath[0][1] };
+                        lastCoords = { lon: tramoPath[tramoPath.length - 1][0], lat: tramoPath[tramoPath.length - 1][1] };
+
+                        // Accumulate delay if design speed is available
+                        if (designSpeeds.has(tramo.codtramo)) {
+                            const dSpeed = designSpeeds.get(tramo.codtramo);
+                            minDesignSpeed = Math.min(minDesignSpeed, dSpeed);
+                            const ltvSpeedMatch = record.speed.match(/(\d+)/);
+                            if (ltvSpeedMatch && !isNaN(endKm)) {
+                                const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
+                                // Distance of this segment within the LTV range
+                                const tMin = Math.min(tramo.pki, tramo.pkd);
+                                const tMax = Math.max(tramo.pki, tramo.pkd);
+                                const overlapMin = Math.max(minPk, tMin);
+                                const overlapMax = Math.min(maxPk, tMax);
+                                const dist = Math.max(0, overlapMax - overlapMin);
+                                if (dist > 0) {
+                                    totalDelay += calculateEnhancedDelay(ltvSpeed, dSpeed, dist, isAv);
                                 }
                             }
                         }
                     }
                 }
 
-                // Now use the best tramo to get precise coordinates
-                const startCoords = findCoordsOnTramo(bestTramo, startKm);
-                const endCoords = !isNaN(endKm) ? findCoordsOnTramo(bestTramo, endKm) : null;
-
-                if (startCoords) {
-                    if (endCoords) {
-                        const midPk = (startKm + endKm) / 2;
-                        const midCoords = findCoordsOnTramo(bestTramo, midPk);
-                        record.latitude = midCoords.lat;
-                        record.longitude = midCoords.lon;
-                        record.path = sliceTramoByPk(bestTramo, startKm, endKm);
+                if (totalPath.length > 0) {
+                    record.path = totalPath;
+                    // For latitude/longitude, use the midpoint or start point
+                    // Let's use the actual midpoint of the joined path if possible
+                    if (totalPath.length >= 2) {
+                        const midIndex = Math.floor(totalPath.length / 2);
+                        record.latitude = totalPath[midIndex][1];
+                        record.longitude = totalPath[midIndex][0];
                     } else {
-                        record.latitude = startCoords.lat;
-                        record.longitude = startCoords.lon;
-                        record.path = [[startCoords.lon, startCoords.lat]];
+                        record.latitude = totalPath[0][1];
+                        record.longitude = totalPath[0][0];
                     }
 
                     record.geocodingMethod = 'wfs';
-                    if (designSpeeds.has(bestTramo.codtramo)) {
-                        record.designSpeed = designSpeeds.get(bestTramo.codtramo);
-                        const ltvSpeedMatch = record.speed.match(/(\d+)/);
-                        if (ltvSpeedMatch && !isNaN(endKm)) {
-                            const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
-                            record.delaySeconds = calculateEnhancedDelay(ltvSpeed, record.designSpeed, Math.abs(endKm - startKm), isAv);
-                        }
+                    if (minDesignSpeed !== Infinity) {
+                        record.designSpeed = minDesignSpeed;
+                        record.delaySeconds = Math.round(totalDelay * 10) / 10;
                     }
                     wfsResolved++;
                 } else {
