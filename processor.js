@@ -842,7 +842,10 @@ async function processFilesBySuffix(suffix, outputPath) {
         .sort((a, b) => a.date.localeCompare(b.date));
 
     const globalLtvMap = new Map();
+    let latestDate = null;
+    
     for (const file of files) {
+        latestDate = file.date; // Files are sorted by date ascending
         console.log(`Parsing ${file.name}...`);
         const records = JSON.parse(fs.readFileSync(file.path, 'utf8'));
         let migrationNeeded = false;
@@ -890,14 +893,29 @@ async function processFilesBySuffix(suffix, outputPath) {
     fs.writeFileSync(outputPath, JSON.stringify(enriched, null, 2));
     console.log(`Regeneration complete for ${suffix}.`);
 
-    // Load GeoJSON for geographical breakdown
-    let provincesGeoJSON, ccaaGeoJSON;
+    // 0. Line Discovery: Fetch all line numbers to ensure we have stats for everything
+    console.log('  Discovering all ADIF lines for comprehensive statistics...');
+    let allAdifLines = [];
     try {
-        provincesGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'provinces.geojson'), 'utf8'));
-        ccaaGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'communities.geojson'), 'utf8'));
+        const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature&typeName=Tramificacion:TramosServicio&outputFormat=application/json&propertyName=cod_linea`;
+        const response = await axios.get(url, { timeout: 30000 });
+        const lineSet = new Set();
+        response.data.features.forEach(f => {
+            const cl = f.properties.cod_linea;
+            if (cl) {
+                const m = cl.match(/^(\d{3})/);
+                if (m) lineSet.add(m[1]);
+            }
+        });
+        allAdifLines = Array.from(lineSet).sort();
+        console.log(`    Discovered ${allAdifLines.length} lines in ADIF network.`);
     } catch (e) {
-        console.warn('GeoJSON data not found, skipping geographical breakdown');
+        console.warn(`    Line discovery failed: ${e.message}. Using lines with LTVs only.`);
+        allAdifLines = Object.keys(enriched).map(ln => ln.match(/LÍNEA\s+(\d{3})/)?.[1]).filter(Boolean);
     }
+
+    // Load GeoJSON for geographical breakdown
+    await ensureGeoDataLoaded();
 
     // Helper to calculate km in each province/ccaa
     const getSpatialKm = (pathPoints) => {
@@ -936,19 +954,33 @@ async function processFilesBySuffix(suffix, outputPath) {
         return stats;
     };
 
-    // Generate line-level statistics
     const lineStats = [];
-    for (const lineName in enriched) {
-        let lineNum = '';
-        const match = lineName.match(/LÍNEA\s+(\d{3})/);
-        if (match) lineNum = match[1];
+    // latestDate is already defined above in the file collection loop
 
-        const lineData = enriched[lineName];
-        if (!lineData.length) continue;
+    // We need line names for discovered lines that don't have LTVs
+    const lineNumToName = new Map();
+    for (const fullName in enriched) {
+        const m = fullName.match(/LÍNEA\s+(\d{3})/);
+        if (m) lineNumToName.set(m[1], fullName);
+    }
 
-        // 1. Merge LTV intervals for the total line
+    for (const lineNum of allAdifLines) {
+        // Ensure the line tramos are downloaded and enriched
+        const tramos = await fetchLineTramos(lineNum);
+        if (tramos.length === 0) continue;
+
+        // Use a standardized name: "LÍNEA XXX"
+        const lineName = `LÍNEA ${lineNum}`;
+        const lineData = enriched[lineName] || [];
+        // Support matching descriptive names from enriched too
+        const enrichedMatchingNames = Object.keys(enriched).filter(k => k.startsWith(`LÍNEA ${lineNum}`));
+        const allRelevantEnrichedData = [];
+        enrichedMatchingNames.forEach(k => allRelevantEnrichedData.push(...enriched[k]));
+
+        // 1. Merge LTV intervals for the total line (ONLY for active LTVs)
         const intervals = [];
-        for (const ltv of lineData) {
+        for (const ltv of allRelevantEnrichedData) {
+            if (ltv.lastSeen !== latestDate) continue;
             const start = parseFloat(ltv.startKm);
             const end = parseFloat(ltv.endKm);
             if (!isNaN(start) && !isNaN(end)) {
@@ -967,36 +999,65 @@ async function processFilesBySuffix(suffix, outputPath) {
             mergedIntervals.push([pS, pE]);
         }
 
+        const lineId = lineNum;
+        const lineGeoStats = new Map(); // "CCAA|Province" -> { totalKm: 0, ltvKm: 0, rawIntervals: [] }
+        const allTramos = tramos;
+        
         // 2. Spatial analysis of the full line geometry (per province/ccaa)
-        const lineGeoStats = new Map(); // "CCAA|Province" -> { totalKm: 0, ltvKm: 0 }
-        if (lineNum && lineTramosCache.has(lineNum)) {
-            const allTramos = lineTramosCache.get(lineNum).tramos;
-            // 2. Spatial analysis of the full line geometry (per province/ccaa)
-            for (const t of allTramos) {
-                if (t.geography) {
-                    for (const geo of t.geography) {
-                        const key = `${geo.ccaa}|${geo.province}`;
-                        if (!lineGeoStats.has(key)) lineGeoStats.set(key, { totalKm: 0, ltvKm: 0 });
-                        lineGeoStats.get(key).totalKm += Math.abs(geo.endPk - geo.startPk);
-                    }
+        for (const t of allTramos) {
+            if (t.geography) {
+                for (const geo of t.geography) {
+                    const key = `${geo.ccaa}|${geo.province}`;
+                    if (!lineGeoStats.has(key)) lineGeoStats.set(key, { totalKm: 0, ltvKm: 0, rawIntervals: [] });
+                    lineGeoStats.get(key).rawIntervals.push([Math.min(geo.startPk, geo.endPk), Math.max(geo.startPk, geo.endPk)]);
                 }
             }
+        }
 
-            // 3. Spatial analysis of LTV paths (per province/ccaa)
+        // Merge Raw Intervals to avoid overcounting overlapping segments (e.g. double track)
+        for (const [key, stats] of lineGeoStats) {
+            if (stats.rawIntervals.length > 0) {
+                stats.rawIntervals.sort((a, b) => a[0] - b[0]);
+                let merged = [];
+                let [pS, pE] = stats.rawIntervals[0];
+                for (let i = 1; i < stats.rawIntervals.length; i++) {
+                    let [cS, cE] = stats.rawIntervals[i];
+                    if (cS <= pE) pE = Math.max(pE, cE);
+                    else { merged.push([pS, pE]); [pS, pE] = [cS, cE]; }
+                }
+                merged.push([pS, pE]);
+                stats.totalKm = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+            }
+        }
+
+        // 3. Spatial analysis of LTV paths (per province/ccaa)
+        if (mergedIntervals.length > 0) {
             for (const [sKm, eKm] of mergedIntervals) {
                 const sMin = Math.min(sKm, eKm);
                 const sMax = Math.max(sKm, eKm);
-                for (const t of allTramos) {
-                    if (t.geography) {
-                        for (const geo of t.geography) {
-                            const iMin = Math.max(sMin, geo.startPk);
-                            const iMax = Math.min(sMax, geo.endPk);
+                // Also need to avoid overcounting LTV on overlapping tramos!
+                // For each CCAA/Province, we find the overlap of current LTV with merged track intervals
+                for (const [key, stats] of lineGeoStats) {
+                    // This is slightly complex: we should merge LTV intersections across all raw segments to avoid overcounting
+                    // But an easier way: find which parts of the merged intervals of THIS CCAA/province are covered by the current LTV
+                    if (stats.rawIntervals.length > 0) {
+                        // We use the already merged track intervals for THIS province
+                        // Re-merge them once for efficiency (already done above)
+                        stats.rawIntervals.sort((a, b) => a[0] - b[0]);
+                        let mergedTrack = [];
+                        let [pS, pE] = stats.rawIntervals[0];
+                        for (let i = 1; i < stats.rawIntervals.length; i++) {
+                            let [cS, cE] = stats.rawIntervals[i];
+                            if (cS <= pE) pE = Math.max(pE, cE);
+                            else { mergedTrack.push([pS, pE]); [pS, pE] = [cS, cE]; }
+                        }
+                        mergedTrack.push([pS, pE]);
+
+                        for (const [mS, mE] of mergedTrack) {
+                            const iMin = Math.max(sMin, mS);
+                            const iMax = Math.min(sMax, mE);
                             const overlap = Math.max(0, iMax - iMin);
-                            if (overlap > 0) {
-                                const key = `${geo.ccaa}|${geo.province}`;
-                                if (!lineGeoStats.has(key)) lineGeoStats.set(key, { totalKm: 0, ltvKm: 0 });
-                                lineGeoStats.get(key).ltvKm += overlap;
-                            }
+                            stats.ltvKm += overlap;
                         }
                     }
                 }
@@ -1005,17 +1066,18 @@ async function processFilesBySuffix(suffix, outputPath) {
 
         // 4. Format into nested structure
         const ccaaGrouped = new Map();
-        let totalLineKm = 1; // used for %? No, use totalLengthKm
         let totalLtvKm = 0;
+        let lineTotalKm = 0;
 
-        for (const [key, stats] of lineGeoStats) {
+        for (const [key, stat] of lineGeoStats) {
             const [ccaa, province] = key.split('|');
             if (!ccaaGrouped.has(ccaa)) ccaaGrouped.set(ccaa, { totalKm: 0, ltvKm: 0, provinces: new Map() });
             const cg = ccaaGrouped.get(ccaa);
-            cg.totalKm += stats.totalKm;
-            cg.ltvKm += stats.ltvKm;
-            cg.provinces.set(province, { name: province, totalKm: stats.totalKm, ltvKm: stats.ltvKm });
-            totalLtvKm += stats.ltvKm;
+            cg.totalKm += stat.totalKm;
+            cg.ltvKm += stat.ltvKm;
+            cg.provinces.set(province, { name: province, totalKm: stat.totalKm, ltvKm: stat.ltvKm });
+            totalLtvKm += stat.ltvKm;
+            lineTotalKm += stat.totalKm;
         }
 
         const formattedBreakdown = Array.from(ccaaGrouped.entries()).map(([ccaa, data]) => ({
@@ -1035,9 +1097,9 @@ async function processFilesBySuffix(suffix, outputPath) {
         lineStats.push({
             line: lineName,
             network: isHighSpeed ? 'high_speed' : 'conventional',
-            totalLengthKm: Math.round(Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0) * 100) / 100,
+            totalLengthKm: Math.round(lineTotalKm * 100) / 100,
             ltvTotalKm: Math.round(totalLtvKm * 100) / 100,
-            ltvPercentage: totalLtvKm > 0 ? Math.round((totalLtvKm / Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0)) * 10000) / 100 : 0,
+            ltvPercentage: lineTotalKm > 0 ? Math.round((totalLtvKm / lineTotalKm) * 10000) / 100 : 0,
             geography: formattedBreakdown
         });
     }
@@ -1086,13 +1148,16 @@ async function reprocess() {
     // Merge stats (in case a line appears in both, e.g. same line ID in DSL and DHL)
     const combinedStatsMap = new Map();
     [...ltvStats, ...avStats].forEach(s => {
-        if (!combinedStatsMap.has(s.line)) {
-            combinedStatsMap.set(s.line, { ...s });
-            // Initialize networks array if needed or just use current s.network
-            combinedStatsMap.get(s.line).networks = [s.network];
-            delete combinedStatsMap.get(s.line).network; // Replace with array for combined
+        const lineNumMatch = s.line.match(/LÍNEA\s+(\d{3})/);
+        const lineId = lineNumMatch ? lineNumMatch[1] : s.line;
+        
+        if (!combinedStatsMap.has(lineId)) {
+            combinedStatsMap.set(lineId, { ...s });
+            combinedStatsMap.get(lineId).networks = [s.network];
+            delete combinedStatsMap.get(lineId).network;
         } else {
-            const existing = combinedStatsMap.get(s.line);
+            const existing = combinedStatsMap.get(lineId);
+            // Update ltv km
             existing.ltvTotalKm = Math.round((existing.ltvTotalKm + s.ltvTotalKm) * 100) / 100;
             existing.ltvPercentage = existing.totalLengthKm > 0 ? Math.round((existing.ltvTotalKm / existing.totalLengthKm) * 10000) / 100 : 0;
             
@@ -1109,7 +1174,7 @@ async function reprocess() {
                     existing.geography.push(g);
                 } else {
                     const eg = existingGeoMap.get(g.name);
-                    eg.totalKm = Math.round((eg.totalKm + g.totalKm) * 100) / 100;
+                    eg.totalKm = Math.max(eg.totalKm, g.totalKm); // Length should be same, take max
                     eg.ltvKm = Math.round((eg.ltvKm + g.ltvKm) * 100) / 100;
                     eg.ltvPercentage = eg.totalKm > 0 ? Math.round((eg.ltvKm / eg.totalKm) * 10000) / 100 : 0;
                     
@@ -1121,7 +1186,7 @@ async function reprocess() {
                             eg.provinces.push(p);
                         } else {
                             const ep = provMap.get(p.name);
-                            ep.totalKm = Math.round((ep.totalKm + p.totalKm) * 100) / 100;
+                            ep.totalKm = Math.max(ep.totalKm, p.totalKm);
                             ep.ltvKm = Math.round((ep.ltvKm + p.ltvKm) * 100) / 100;
                             ep.ltvPercentage = ep.totalKm > 0 ? Math.round((ep.ltvKm / ep.totalKm) * 10000) / 100 : 0;
                         }
@@ -1131,6 +1196,20 @@ async function reprocess() {
         }
     });
 
+    // Final Network Cleanup: A line is high_speed ONLY if it's in the 01x-09x range AND (has LTVs in DHL or 0 LTVs in total)
+    // Actually, following the user's rule and Line 100 case:
+    const highSpeedRange = ['010', '012', '014', '016', '020', '022', '024', '030', '032', '034', '036', '040', '042', '044', '046', '050', '052', '054', '056', '060', '062', '064', '066', '068', '070', '072', '074', '076', '080', '082', '084', '982'];
+    
+    combinedStatsMap.forEach((s, lineId) => {
+        const hasHistoryInAV = avStats.some(av => av.line.includes(lineId) && av.ltvTotalKm > 0);
+        const isInHighSpeedRange = highSpeedRange.includes(lineId);
+        
+        if (hasHistoryInAV || (isInHighSpeedRange && !ltvStats.some(conv => conv.line.includes(lineId) && conv.ltvTotalKm > 0))) {
+            s.networks = ['high_speed'];
+        } else {
+            s.networks = ['conventional'];
+        }
+    });
     const LINES_JSON = path.join(OUTPUT_DIR, 'lines.json');
     fs.writeFileSync(LINES_JSON, JSON.stringify(Array.from(combinedStatsMap.values()).sort((a,b) => a.line.localeCompare(b.line)), null, 2));
     console.log('Lines statistics generated in lines.json');
