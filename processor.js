@@ -165,6 +165,79 @@ function extractLineString(geometry) {
     return null;
 }
 
+let provincesGeoJSON = null;
+let ccaaGeoJSON = null;
+
+async function ensureGeoDataLoaded() {
+    if (provincesGeoJSON && ccaaGeoJSON) return;
+    try {
+        provincesGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'provinces.geojson'), 'utf8'));
+        ccaaGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'communities.geojson'), 'utf8'));
+    } catch (e) {
+        console.warn('GeoJSON data not found');
+    }
+}
+
+function enrichTramoWithGeo(tramo) {
+    const line = extractLineString(tramo.geometry);
+    if (!line) return;
+
+    const coords = line.coordinates;
+    const geoIntervals = [];
+    if (coords.length < 2) return;
+
+    const pStartKm = tramo.pki;
+    const pEndKm = tramo.pkd;
+    const totalDist = turf.length(line);
+
+    let lastKey = null;
+    let segmentStartKm = pStartKm;
+
+    for (let i = 0; i < coords.length - 1; i++) {
+        const p1 = coords[i];
+        const p2 = coords[i+1];
+        const mid = [ (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 ];
+        const pointMid = turf.point(mid);
+        const ratio = i / (coords.length - 1);
+        const currentPk = pStartKm + (pEndKm - pStartKm) * ratio;
+
+        let province = 'Unknown';
+        let ccaa = 'Unknown';
+
+        for (const f of provincesGeoJSON.features) {
+            if (turf.booleanPointInPolygon(pointMid, f.geometry)) {
+                province = f.properties.name;
+                break;
+            }
+        }
+        for (const f of ccaaGeoJSON.features) {
+            if (turf.booleanPointInPolygon(pointMid, f.geometry)) {
+                ccaa = f.properties.name;
+                break;
+            }
+        }
+
+        const key = `${ccaa}|${province}`;
+        if (lastKey !== null && key !== lastKey) {
+            geoIntervals.push({
+                startPk: Math.min(segmentStartKm, currentPk),
+                endPk: Math.max(segmentStartKm, currentPk),
+                ccaa: lastKey.split('|')[0],
+                province: lastKey.split('|')[1]
+            });
+            segmentStartKm = currentPk;
+        }
+        lastKey = key;
+    }
+    geoIntervals.push({
+        startPk: Math.min(segmentStartKm, pEndKm),
+        endPk: Math.max(segmentStartKm, pEndKm),
+        ccaa: lastKey.split('|')[0],
+        province: lastKey.split('|')[1]
+    });
+    tramo.geography = geoIntervals;
+}
+
 /**
  * Finds coordinates for a target PK on a specific tramo geometry.
  */
@@ -225,7 +298,17 @@ async function fetchLineTramos(lineNum) {
     const cacheFile = path.join(WFS_CACHE_DIR, `tramos_${lineNum}.json`);
 
     if (fs.existsSync(cacheFile)) {
-        return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+        const tramos = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+        // If cached tramos don't have geography labeling, enrich and update cache
+        if (tramos.length > 0 && !tramos[0].geography) {
+            await ensureGeoDataLoaded();
+            if (provincesGeoJSON && ccaaGeoJSON) {
+                console.log(`  Enriching cache for line ${lineNum} with geography...`);
+                tramos.forEach(t => enrichTramoWithGeo(t));
+                fs.writeFileSync(cacheFile, JSON.stringify(tramos, null, 2));
+            }
+        }
+        return tramos;
     }
 
     try {
@@ -255,6 +338,16 @@ async function fetchLineTramos(lineNum) {
             }));
 
         fs.writeFileSync(cacheFile, JSON.stringify(tramos, null, 2));
+        
+        // Enrich with geography if not already present
+        if (tramos.length > 0) {
+            await ensureGeoDataLoaded();
+            if (provincesGeoJSON && ccaaGeoJSON) {
+                tramos.forEach(t => enrichTramoWithGeo(t));
+                fs.writeFileSync(cacheFile, JSON.stringify(tramos, null, 2));
+            }
+        }
+        
         return tramos;
     } catch (err) {
         console.warn(`  WFS fetchLineTramos failed for line ${lineNum}: ${err.message}`);
@@ -797,6 +890,52 @@ async function processFilesBySuffix(suffix, outputPath) {
     fs.writeFileSync(outputPath, JSON.stringify(enriched, null, 2));
     console.log(`Regeneration complete for ${suffix}.`);
 
+    // Load GeoJSON for geographical breakdown
+    let provincesGeoJSON, ccaaGeoJSON;
+    try {
+        provincesGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'provinces.geojson'), 'utf8'));
+        ccaaGeoJSON = JSON.parse(fs.readFileSync(path.join(__dirname, 'communities.geojson'), 'utf8'));
+    } catch (e) {
+        console.warn('GeoJSON data not found, skipping geographical breakdown');
+    }
+
+    // Helper to calculate km in each province/ccaa
+    const getSpatialKm = (pathPoints) => {
+        const stats = new Map(); // "CCAA|Province" -> km
+        if (!pathPoints || pathPoints.length < 2) return stats;
+
+        for (let i = 0; i < pathPoints.length - 1; i++) {
+            const p1 = pathPoints[i];
+            const p2 = pathPoints[i+1];
+            const dist = turf.distance(turf.point(p1), turf.point(p2));
+            const mid = [ (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 ];
+            const pointMid = turf.point(mid);
+
+            let province = 'Unknown';
+            let ccaa = 'Unknown';
+
+            if (provincesGeoJSON) {
+                for (const f of provincesGeoJSON.features) {
+                    if (turf.booleanPointInPolygon(pointMid, f.geometry)) {
+                        province = f.properties.name;
+                        break;
+                    }
+                }
+            }
+            if (ccaaGeoJSON) {
+                for (const f of ccaaGeoJSON.features) {
+                    if (turf.booleanPointInPolygon(pointMid, f.geometry)) {
+                        ccaa = f.properties.name;
+                        break;
+                    }
+                }
+            }
+            const key = `${ccaa}|${province}`;
+            stats.set(key, (stats.get(key) || 0) + dist);
+        }
+        return stats;
+    };
+
     // Generate line-level statistics
     const lineStats = [];
     for (const lineName in enriched) {
@@ -804,44 +943,100 @@ async function processFilesBySuffix(suffix, outputPath) {
         const match = lineName.match(/LÍNEA\s+(\d{3})/);
         if (match) lineNum = match[1];
 
-        // Merge overlapping LTV intervals to avoid overcounting
+        const lineData = enriched[lineName];
+        if (!lineData.length) continue;
+
+        // 1. Merge LTV intervals for the total line
         const intervals = [];
-        for (const ltv of enriched[lineName]) {
+        for (const ltv of lineData) {
             const start = parseFloat(ltv.startKm);
             const end = parseFloat(ltv.endKm);
             if (!isNaN(start) && !isNaN(end)) {
                 intervals.push([Math.min(start, end), Math.max(start, end)]);
             }
         }
-
-        let ltvKm = 0;
+        intervals.sort((a, b) => a[0] - b[0]);
+        let mergedIntervals = [];
         if (intervals.length > 0) {
-            intervals.sort((a, b) => a[0] - b[0]);
-            let merged = [];
-            let [pStart, pEnd] = intervals[0];
+            let [pS, pE] = intervals[0];
             for (let i = 1; i < intervals.length; i++) {
-                let [cStart, cEnd] = intervals[i];
-                if (cStart <= pEnd) {
-                    pEnd = Math.max(pEnd, cEnd);
-                } else {
-                    merged.push([pStart, pEnd]);
-                    [pStart, pEnd] = [cStart, cEnd];
+                let [cS, cE] = intervals[i];
+                if (cS <= pE) pE = Math.max(pE, cE);
+                else { mergedIntervals.push([pS, pE]); [pS, pE] = [cS, cE]; }
+            }
+            mergedIntervals.push([pS, pE]);
+        }
+
+        // 2. Spatial analysis of the full line geometry (per province/ccaa)
+        const lineGeoStats = new Map(); // "CCAA|Province" -> { totalKm: 0, ltvKm: 0 }
+        if (lineNum && lineTramosCache.has(lineNum)) {
+            const allTramos = lineTramosCache.get(lineNum).tramos;
+            // 2. Spatial analysis of the full line geometry (per province/ccaa)
+            for (const t of allTramos) {
+                if (t.geography) {
+                    for (const geo of t.geography) {
+                        const key = `${geo.ccaa}|${geo.province}`;
+                        if (!lineGeoStats.has(key)) lineGeoStats.set(key, { totalKm: 0, ltvKm: 0 });
+                        lineGeoStats.get(key).totalKm += Math.abs(geo.endPk - geo.startPk);
+                    }
                 }
             }
-            merged.push([pStart, pEnd]);
-            ltvKm = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+
+            // 3. Spatial analysis of LTV paths (per province/ccaa)
+            for (const [sKm, eKm] of mergedIntervals) {
+                const sMin = Math.min(sKm, eKm);
+                const sMax = Math.max(sKm, eKm);
+                for (const t of allTramos) {
+                    if (t.geography) {
+                        for (const geo of t.geography) {
+                            const iMin = Math.max(sMin, geo.startPk);
+                            const iMax = Math.min(sMax, geo.endPk);
+                            const overlap = Math.max(0, iMax - iMin);
+                            if (overlap > 0) {
+                                const key = `${geo.ccaa}|${geo.province}`;
+                                if (!lineGeoStats.has(key)) lineGeoStats.set(key, { totalKm: 0, ltvKm: 0 });
+                                lineGeoStats.get(key).ltvKm += overlap;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        let totalLength = 0;
-        if (lineNum && lineTramosCache.has(lineNum)) {
-            totalLength = lineTramosCache.get(lineNum).totalLength;
+        // 4. Format into nested structure
+        const ccaaGrouped = new Map();
+        let totalLineKm = 1; // used for %? No, use totalLengthKm
+        let totalLtvKm = 0;
+
+        for (const [key, stats] of lineGeoStats) {
+            const [ccaa, province] = key.split('|');
+            if (!ccaaGrouped.has(ccaa)) ccaaGrouped.set(ccaa, { totalKm: 0, ltvKm: 0, provinces: new Map() });
+            const cg = ccaaGrouped.get(ccaa);
+            cg.totalKm += stats.totalKm;
+            cg.ltvKm += stats.ltvKm;
+            cg.provinces.set(province, { name: province, totalKm: stats.totalKm, ltvKm: stats.ltvKm });
+            totalLtvKm += stats.ltvKm;
         }
+
+        const formattedBreakdown = Array.from(ccaaGrouped.entries()).map(([ccaa, data]) => ({
+            name: ccaa,
+            totalKm: Math.round(data.totalKm * 100) / 100,
+            ltvKm: Math.round(data.ltvKm * 100) / 100,
+            ltvPercentage: data.totalKm > 0 ? Math.round((data.ltvKm / data.totalKm) * 10000) / 100 : 0,
+            provinces: Array.from(data.provinces.values()).map(p => ({
+                name: p.name,
+                totalKm: Math.round(p.totalKm * 100) / 100,
+                ltvKm: Math.round(p.ltvKm * 100) / 100,
+                ltvPercentage: p.totalKm > 0 ? Math.round((p.ltvKm / p.totalKm) * 10000) / 100 : 0
+            }))
+        })).sort((a, b) => b.totalKm - a.totalKm);
 
         lineStats.push({
             line: lineName,
-            totalLengthKm: Math.round(totalLength * 100) / 100,
-            ltvTotalKm: Math.round(ltvKm * 100) / 100,
-            ltvPercentage: totalLength > 0 ? Math.round((ltvKm / totalLength) * 10000) / 100 : 0
+            totalLengthKm: Math.round(Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0) * 100) / 100,
+            ltvTotalKm: Math.round(totalLtvKm * 100) / 100,
+            ltvPercentage: totalLtvKm > 0 ? Math.round((totalLtvKm / Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0)) * 10000) / 100 : 0,
+            geography: formattedBreakdown
         });
     }
 
@@ -893,10 +1088,37 @@ async function reprocess() {
             combinedStatsMap.set(s.line, { ...s });
         } else {
             const existing = combinedStatsMap.get(s.line);
-            // Since intervals were merged within each suffix, and DSL/DHL are separate networks,
-            // we can just sum the totals.
             existing.ltvTotalKm = Math.round((existing.ltvTotalKm + s.ltvTotalKm) * 100) / 100;
             existing.ltvPercentage = existing.totalLengthKm > 0 ? Math.round((existing.ltvTotalKm / existing.totalLengthKm) * 10000) / 100 : 0;
+            
+            // Merge geography
+            const existingGeoMap = new Map();
+            existing.geography.forEach(g => existingGeoMap.set(g.name, g));
+            
+            s.geography.forEach(g => {
+                if (!existingGeoMap.has(g.name)) {
+                    existing.geography.push(g);
+                } else {
+                    const eg = existingGeoMap.get(g.name);
+                    eg.totalKm = Math.round((eg.totalKm + g.totalKm) * 100) / 100;
+                    eg.ltvKm = Math.round((eg.ltvKm + g.ltvKm) * 100) / 100;
+                    eg.ltvPercentage = eg.totalKm > 0 ? Math.round((eg.ltvKm / eg.totalKm) * 10000) / 100 : 0;
+                    
+                    // Merge provinces
+                    const provMap = new Map();
+                    eg.provinces.forEach(p => provMap.set(p.name, p));
+                    g.provinces.forEach(p => {
+                        if (!provMap.has(p.name)) {
+                            eg.provinces.push(p);
+                        } else {
+                            const ep = provMap.get(p.name);
+                            ep.totalKm = Math.round((ep.totalKm + p.totalKm) * 100) / 100;
+                            ep.ltvKm = Math.round((ep.ltvKm + p.ltvKm) * 100) / 100;
+                            ep.ltvPercentage = ep.totalKm > 0 ? Math.round((ep.ltvKm / ep.totalKm) * 10000) / 100 : 0;
+                        }
+                    });
+                }
+            });
         }
     });
 
