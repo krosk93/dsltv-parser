@@ -1031,8 +1031,10 @@ async function processFilesBySuffix(suffix, outputPath) {
             }))
         })).sort((a, b) => b.totalKm - a.totalKm);
 
+        const isHighSpeed = suffix.includes('_dhltv');
         lineStats.push({
             line: lineName,
+            network: isHighSpeed ? 'high_speed' : 'conventional',
             totalLengthKm: Math.round(Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0) * 100) / 100,
             ltvTotalKm: Math.round(totalLtvKm * 100) / 100,
             ltvPercentage: totalLtvKm > 0 ? Math.round((totalLtvKm / Array.from(lineGeoStats.values()).reduce((sum, s) => sum + s.totalKm, 0)) * 10000) / 100 : 0,
@@ -1086,10 +1088,17 @@ async function reprocess() {
     [...ltvStats, ...avStats].forEach(s => {
         if (!combinedStatsMap.has(s.line)) {
             combinedStatsMap.set(s.line, { ...s });
+            // Initialize networks array if needed or just use current s.network
+            combinedStatsMap.get(s.line).networks = [s.network];
+            delete combinedStatsMap.get(s.line).network; // Replace with array for combined
         } else {
             const existing = combinedStatsMap.get(s.line);
             existing.ltvTotalKm = Math.round((existing.ltvTotalKm + s.ltvTotalKm) * 100) / 100;
             existing.ltvPercentage = existing.totalLengthKm > 0 ? Math.round((existing.ltvTotalKm / existing.totalLengthKm) * 10000) / 100 : 0;
+            
+            if (!existing.networks.includes(s.network)) {
+                existing.networks.push(s.network);
+            }
             
             // Merge geography
             const existingGeoMap = new Map();
