@@ -531,14 +531,24 @@ async function geocode(ltvData, isAv = false) {
                 let totalPath = [];
                 let totalDelay = 0;
                 let minDesignSpeed = Infinity;
-                let firstCoords = null;
-                let lastCoords = null;
 
                 for (const tramo of candidates) {
                     const tramoPath = sliceTramoByPk(tramo, startKm, isNaN(endKm) ? startKm : endKm);
                     if (tramoPath.length > 0) {
-                        // If appending, check for duplicates at the junction
-                        if (totalPath.length > 0 && tramoPath.length > 0) {
+                        // Spatial continuity check: avoid jumps > 5km
+                        if (totalPath.length > 0) {
+                            const lastPoint = totalPath[totalPath.length - 1];
+                            const firstPoint = tramoPath[0];
+                            const jumpDist = Math.sqrt(Math.pow(lastPoint[0] - firstPoint[0], 2) + Math.pow(lastPoint[1] - firstPoint[1], 2));
+                            if (jumpDist > 0.05) { // ~5km
+                                // If the LTV is very short, we might have picked multiple overlapping 
+                                // but unrelated segments. Only keep the first one that matched our target.
+                                continue;
+                            }
+                        }
+
+                        // Check for duplicates at the junction
+                        if (totalPath.length > 0) {
                             const lastPoint = totalPath[totalPath.length - 1];
                             const firstPoint = tramoPath[0];
                             if (lastPoint[0] === firstPoint[0] && lastPoint[1] === firstPoint[1]) {
@@ -550,9 +560,6 @@ async function geocode(ltvData, isAv = false) {
                             totalPath.push(...tramoPath);
                         }
 
-                        if (!firstCoords) firstCoords = { lon: tramoPath[0][0], lat: tramoPath[0][1] };
-                        lastCoords = { lon: tramoPath[tramoPath.length - 1][0], lat: tramoPath[tramoPath.length - 1][1] };
-
                         // Accumulate delay if design speed is available
                         if (designSpeeds.has(tramo.codtramo)) {
                             const dSpeed = designSpeeds.get(tramo.codtramo);
@@ -560,7 +567,6 @@ async function geocode(ltvData, isAv = false) {
                             const ltvSpeedMatch = record.speed.match(/(\d+)/);
                             if (ltvSpeedMatch && !isNaN(endKm)) {
                                 const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
-                                // Distance of this segment within the LTV range
                                 const tMin = Math.min(tramo.pki, tramo.pkd);
                                 const tMax = Math.max(tramo.pki, tramo.pkd);
                                 const overlapMin = Math.max(minPk, tMin);
@@ -576,16 +582,10 @@ async function geocode(ltvData, isAv = false) {
 
                 if (totalPath.length > 0) {
                     record.path = totalPath;
-                    // For latitude/longitude, use the midpoint or start point
-                    // Let's use the actual midpoint of the joined path if possible
-                    if (totalPath.length >= 2) {
-                        const midIndex = Math.floor(totalPath.length / 2);
-                        record.latitude = totalPath[midIndex][1];
-                        record.longitude = totalPath[midIndex][0];
-                    } else {
-                        record.latitude = totalPath[0][1];
-                        record.longitude = totalPath[0][0];
-                    }
+                    // For latitude/longitude, use the midpoint of the joined path
+                    const midIndex = Math.floor(totalPath.length / 2);
+                    record.latitude = totalPath[midIndex][1];
+                    record.longitude = totalPath[midIndex][0];
 
                     record.geocodingMethod = 'wfs';
                     if (minDesignSpeed !== Infinity) {
