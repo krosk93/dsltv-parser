@@ -426,6 +426,7 @@ async function geocode(ltvData, isAv = false) {
     // ── Phase 1: WFS-based geocoding using ADIF PKTeoricos ──
     let wfsResolved = 0;
     let wfsFailed = 0;
+    const lineTramosCache = new Map(); // lineNum → { tramos: Array, totalLength: number }
 
     try {
         console.log('  Phase 1: Querying ADIF WFS for precise railway coordinates...');
@@ -433,28 +434,34 @@ async function geocode(ltvData, isAv = false) {
         // Collect unique line numbers
         const lineNumbers = new Set();
         for (const lineName in ltvData) {
-            const match = lineName.match(/LÍNEA\s+(\d{3})/);
+            const match = lineName.match(/LÍNEA\s+(\d+)/);
             if (match) lineNumbers.add(match[1]);
         }
         console.log(`  Found ${lineNumbers.size} unique line numbers`);
 
         // For each line, resolve tramos with geometry
-        const lineTramosCache = new Map(); // lineNum → Array of Tramos
         for (const lineNum of lineNumbers) {
             const tramos = await fetchLineTramos(lineNum);
             if (tramos.length > 0) {
-                lineTramosCache.set(lineNum, tramos);
-                console.log(`  Line ${lineNum}: loaded ${tramos.length} segments with geometry`);
+                // Calculate line length as the sum of geometry lengths, 
+                // but avoid overcounting parallel tracks by using PK range coverage
+                const pkIntervals = tramos.map(t => [t.pki, t.pkd]);
+                const routeLength = calculateIntervalSum(pkIntervals);
+                
+                lineTramosCache.set(lineNum, { tramos, totalLength: routeLength });
+                console.log(`  Line ${lineNum}: loaded ${tramos.length} segments, route length: ${routeLength.toFixed(2)} km`);
             }
         }
 
         // Apply WFS coordinates to each record
         for (const lineName in ltvData) {
-            const match = lineName.match(/LÍNEA\s+(\d{3})/);
+            const match = lineName.match(/LÍNEA\s+(\d+)/);
             if (!match) continue;
             const lineNum = match[1];
-            const allTramos = lineTramosCache.get(lineNum);
-            if (!allTramos) continue;
+            const lineInfo = lineTramosCache.get(lineNum);
+            if (!lineInfo) continue;
+            const allTramos = lineInfo.tramos;
+            const lineTotalLength = lineInfo.totalLength;
 
             for (const record of ltvData[lineName]) {
                 const startKm = parseFloat(record.startKm);
@@ -644,7 +651,7 @@ async function geocode(ltvData, isAv = false) {
         }
     }
     console.log(`  Station fallback: ${stationResolved} additional entries resolved`);
-    return ltvData;
+    return { enriched: ltvData, lineTramosCache };
 }
 
 async function reverseGeocode(ltvData) {
@@ -784,24 +791,119 @@ async function processFilesBySuffix(suffix, outputPath) {
     const sortedGrouped = {};
     Object.keys(grouped).sort().forEach(key => { sortedGrouped[key] = grouped[key]; });
 
-    let enriched = await geocode(sortedGrouped, suffix.includes('_dhltv'));
+    let { enriched, lineTramosCache } = await geocode(sortedGrouped, suffix.includes('_dhltv'));
     enriched = await reverseGeocode(enriched);
 
     fs.writeFileSync(outputPath, JSON.stringify(enriched, null, 2));
     console.log(`Regeneration complete for ${suffix}.`);
-    return enriched;
+
+    // Generate line-level statistics
+    const lineStats = [];
+    for (const lineName in enriched) {
+        let lineNum = '';
+        const match = lineName.match(/LÍNEA\s+(\d{3})/);
+        if (match) lineNum = match[1];
+
+        // Merge overlapping LTV intervals to avoid overcounting
+        const intervals = [];
+        for (const ltv of enriched[lineName]) {
+            const start = parseFloat(ltv.startKm);
+            const end = parseFloat(ltv.endKm);
+            if (!isNaN(start) && !isNaN(end)) {
+                intervals.push([Math.min(start, end), Math.max(start, end)]);
+            }
+        }
+
+        let ltvKm = 0;
+        if (intervals.length > 0) {
+            intervals.sort((a, b) => a[0] - b[0]);
+            let merged = [];
+            let [pStart, pEnd] = intervals[0];
+            for (let i = 1; i < intervals.length; i++) {
+                let [cStart, cEnd] = intervals[i];
+                if (cStart <= pEnd) {
+                    pEnd = Math.max(pEnd, cEnd);
+                } else {
+                    merged.push([pStart, pEnd]);
+                    [pStart, pEnd] = [cStart, cEnd];
+                }
+            }
+            merged.push([pStart, pEnd]);
+            ltvKm = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+        }
+
+        let totalLength = 0;
+        if (lineNum && lineTramosCache.has(lineNum)) {
+            totalLength = lineTramosCache.get(lineNum).totalLength;
+        }
+
+        lineStats.push({
+            line: lineName,
+            totalLengthKm: Math.round(totalLength * 100) / 100,
+            ltvTotalKm: Math.round(ltvKm * 100) / 100,
+            ltvPercentage: totalLength > 0 ? Math.round((ltvKm / totalLength) * 10000) / 100 : 0
+        });
+    }
+
+    return { enriched, lineStats };
+}
+
+/**
+ * Merges overlapping [start, end] intervals and returns the total length covered.
+ */
+function calculateIntervalSum(intervals) {
+    if (intervals.length === 0) return 0;
+    const sorted = intervals
+        .map(i => [Math.min(i[0], i[1]), Math.max(i[0], i[1])])
+        .sort((a, b) => a[0] - b[0]);
+    
+    let total = 0;
+    let currentStart = sorted[0][0];
+    let currentEnd = sorted[0][1];
+    
+    for (let i = 1; i < sorted.length; i++) {
+        const nextStart = sorted[i][0];
+        const nextEnd = sorted[i][1];
+        if (nextStart <= currentEnd) {
+            currentEnd = Math.max(currentEnd, nextEnd);
+        } else {
+            total += (currentEnd - currentStart);
+            currentStart = nextStart;
+            currentEnd = nextEnd;
+        }
+    }
+    total += (currentEnd - currentStart);
+    return total;
 }
 
 async function reprocess() {
     console.log('Reprocessing all JSONs...');
     
     console.log('--- Processing DSLTV ---');
-    const ltv = await processFilesBySuffix('_dsltv.json', LTV_JSON);
+    const { ltv, lineStats: ltvStats } = await processFilesBySuffix('_dsltv.json', LTV_JSON);
     
     console.log('--- Processing DHLTV ---');
     const LTV_AV_JSON = path.join(OUTPUT_DIR, 'ltv_av.json');
-    const av = await processFilesBySuffix('_dhltv.json', LTV_AV_JSON);
+    const { av, lineStats: avStats } = await processFilesBySuffix('_dhltv.json', LTV_AV_JSON);
     
+    // Merge stats (in case a line appears in both, e.g. same line ID in DSL and DHL)
+    const combinedStatsMap = new Map();
+    [...ltvStats, ...avStats].forEach(s => {
+        if (!combinedStatsMap.has(s.line)) {
+            combinedStatsMap.set(s.line, { ...s });
+        } else {
+            const existing = combinedStatsMap.get(s.line);
+            // Since intervals were merged within each suffix, and DSL/DHL are separate networks,
+            // we can just sum the totals.
+            existing.ltvTotalKm = Math.round((existing.ltvTotalKm + s.ltvTotalKm) * 100) / 100;
+            existing.ltvPercentage = existing.totalLengthKm > 0 ? Math.round((existing.ltvTotalKm / existing.totalLengthKm) * 10000) / 100 : 0;
+        }
+    });
+
+    const LINES_JSON = path.join(OUTPUT_DIR, 'lines.json');
+    fs.writeFileSync(LINES_JSON, JSON.stringify(Array.from(combinedStatsMap.values()).sort((a,b) => a.line.localeCompare(b.line)), null, 2));
+    console.log('Lines statistics generated in lines.json');
+
     return { ltv, av };
 }
 
