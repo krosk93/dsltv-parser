@@ -2,7 +2,12 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const { convertToJson, parseSinglePdf, reprocess, extractVigorDate, PDF_DIR, isWeekly } = require('./processor');
+const LTVProcessor = require('./src/services/LTVProcessor');
+const PDFParser = require('./src/io/PDFParser');
+const Config = require('./src/core/Config');
+
+const processor = new LTVProcessor();
+const { PDF_DIR } = Config;
 
 // Replace with your actual token or use process.env.TOKEN
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -51,7 +56,7 @@ bot.on('document', async (msg) => {
         bot.deleteMessage(chatId, msg.message_id);
 
         // Extract date
-        const vigorDate = await extractVigorDate(tempPath);
+        const vigorDate = await PDFParser.extractVigorDate(tempPath);
         if (!vigorDate) {
             bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un document de LTV vàlid. Si us plau, verifica-ho.');
             fs.unlinkSync(tempPath);
@@ -59,7 +64,7 @@ bot.on('document', async (msg) => {
         }
 
         let newFileName = `${vigorDate}_DSLTV.json`;
-        const weekly = await isWeekly(tempPath);
+        const weekly = await PDFParser.isWeekly(tempPath);
         if (!weekly) {
             newFileName = `${vigorDate}_DHLTV.json`;
         }
@@ -70,7 +75,7 @@ bot.on('document', async (msg) => {
             return;
         }
 
-        const parsedData = await parseSinglePdf(tempPath);
+        const parsedData = await PDFParser.parse(tempPath);
 
         if (parsedData.length === 0) {
             bot.sendMessage(chatId, 'Vaja, el PDF no sembla ser un document de LTV vàlid. Si us plau, verifica-ho.');
@@ -81,7 +86,7 @@ bot.on('document', async (msg) => {
         fs.writeFileSync(finalPath, JSON.stringify(parsedData, null, 2));
         fs.unlinkSync(tempPath);
 
-        await reprocess();
+        await processor.reprocess();
         bot.sendMessage(chatId, `Gracies per a la teva contribució!`);
 
     } catch (error) {
@@ -105,6 +110,6 @@ bot.onText(/\/start/, (msg) => {
 });
 
 (async function () {
-    await convertToJson();
-    await reprocess();
+    await processor.convertToJson();
+    await processor.reprocess();
 })();

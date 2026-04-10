@@ -14,8 +14,9 @@ RUN apk add --no-cache tini
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/bot.js ./
-COPY --from=builder /app/processor.js ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/index.js ./index.js
+COPY --from=builder /app/bot.js ./bot.js
 COPY --from=builder /app/stations.json ./
 COPY --from=builder /app/communities.geojson ./
 COPY --from=builder /app/provinces.geojson ./
