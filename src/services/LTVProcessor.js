@@ -98,6 +98,7 @@ class LTVProcessor {
         const isAv = suffix.includes('_dhltv');
         let enriched = await this.geocode(sortedGrouped, isAv);
         enriched = await this.reverseGeocode(enriched);
+        enriched = await this.enrichWithServices(enriched);
 
         fs.writeFileSync(outputPath, JSON.stringify(enriched, null, 2));
         
@@ -399,7 +400,56 @@ class LTVProcessor {
 
         fs.writeFileSync(Config.LINES_JSON, JSON.stringify(Array.from(combinedStatsMap.values()).sort((a,b) => a.line.localeCompare(b.line)), null, 2));
         console.log('Lines statistics generated.');
-        return { ltv, av };
+    }
+
+    async enrichWithServices(ltvData) {
+        console.log('Enriching with affected services...');
+        const rodaliesPath = path.join(process.cwd(), 'src/data/rodalies.json');
+        if (!fs.existsSync(rodaliesPath)) return ltvData;
+        
+        const rodalies = JSON.parse(fs.readFileSync(rodaliesPath, 'utf8'));
+        
+        const normalizeLine = (id) => {
+            const m = id.match(/(\d+)/);
+            if (!m) return '';
+            let n = parseInt(m[1], 10);
+            if (m[1].length === 5) n = n % 1000;
+            return n.toString();
+        };
+
+        const lineToServices = {};
+        rodalies.forEach(s => {
+            (s.trackLines || []).forEach(tl => {
+                const nl = normalizeLine(tl.line);
+                if (!nl) return;
+                if (!lineToServices[nl]) lineToServices[nl] = [];
+                lineToServices[nl].push({
+                    name: s.line,
+                    minPk: Math.min(tl.startPk, tl.endPk),
+                    maxPk: Math.max(tl.startPk, tl.endPk)
+                });
+            });
+        });
+
+        for (const groupName in ltvData) {
+            const nl = normalizeLine(groupName);
+            const services = lineToServices[nl] || [];
+
+            ltvData[groupName].forEach(record => {
+                const sPk = parseFloat(record.startKm);
+                const ePk = parseFloat(record.endKm);
+                if (isNaN(sPk)) {
+                    record.affectedServices = [];
+                    return;
+                }
+                const minL = Math.min(sPk, isNaN(ePk) ? sPk : ePk);
+                const maxL = Math.max(sPk, isNaN(ePk) ? sPk : ePk);
+                const TOL = 0.01;
+                const affected = services.filter(s => (maxL >= s.minPk - TOL) && (minL <= s.maxPk + TOL)).map(s => s.name);
+                record.affectedServices = Array.from(new Set(affected)).sort();
+            });
+        }
+        return ltvData;
     }
 }
 

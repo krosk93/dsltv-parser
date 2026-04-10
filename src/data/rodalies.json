@@ -1,0 +1,2310 @@
+[
+    {
+        "line": "R1",
+        "stations": [
+            {
+                "name": "Molins de Rei",
+                "code": "72300"
+            },
+            {
+                "name": "Sant Feliu de Llobregat",
+                "code": "72301"
+            },
+            {
+                "name": "Sant Joan Despí",
+                "code": "72302"
+            },
+            {
+                "name": "Cornellà",
+                "code": "72303"
+            },
+            {
+                "name": "L'Hospitalet de Llobregat",
+                "code": "72305"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Plaça de Catalunya",
+                "code": "78805"
+            },
+            {
+                "name": "Barcelona-Arc de Triomf",
+                "code": "78804"
+            },
+            {
+                "name": "Barcelona-El Clot",
+                "code": "79009"
+            },
+            {
+                "name": "Sant Adrià de Besòs",
+                "code": "79403"
+            },
+            {
+                "name": "Badalona",
+                "code": "79404"
+            },
+            {
+                "name": "Montgat",
+                "code": "79405"
+            },
+            {
+                "name": "Montgat Nord",
+                "code": "79406"
+            },
+            {
+                "name": "El Masnou",
+                "code": "79407"
+            },
+            {
+                "name": "Ocata",
+                "code": "79408"
+            },
+            {
+                "name": "Premià de Mar",
+                "code": "79409"
+            },
+            {
+                "name": "Vilassar de Mar",
+                "code": "79410"
+            },
+            {
+                "name": "Cabrera de Mar-Vilassar de Mar",
+                "code": "79412"
+            },
+            {
+                "name": "Mataró",
+                "code": "79500"
+            },
+            {
+                "name": "Sant Andreu de Llavaneres",
+                "code": "79501"
+            },
+            {
+                "name": "Caldes d'Estrac",
+                "code": "79502"
+            },
+            {
+                "name": "Arenys de Mar",
+                "code": "79600"
+            },
+            {
+                "name": "Canet de Mar",
+                "code": "79601"
+            },
+            {
+                "name": "Sant Pol de Mar",
+                "code": "79602"
+            },
+            {
+                "name": "Calella",
+                "code": "79603"
+            },
+            {
+                "name": "Pineda de Mar",
+                "code": "79604"
+            },
+            {
+                "name": "Santa Susanna",
+                "code": "79608"
+            },
+            {
+                "name": "Malgrat de Mar",
+                "code": "79605"
+            },
+            {
+                "name": "Blanes",
+                "code": "79606"
+            },
+            {
+                "name": "Tordera",
+                "code": "79607"
+            },
+            {
+                "name": "Maçanet-Massanes",
+                "code": "79200"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 85.3,
+                "endPk": 95.2,
+                "stations": [
+                    "Molins de Rei",
+                    "Sant Feliu de Llobregat",
+                    "Sant Joan Despí",
+                    "Cornellà",
+                    "L'Hospitalet de Llobregat"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 99.3,
+                "endPk": 133.1,
+                "stations": [
+                    "Barcelona-Sants",
+                    "Barcelona-Plaça de Catalunya",
+                    "Barcelona-Arc de Triomf",
+                    "Barcelona-El Clot",
+                    "Sant Adrià de Besòs",
+                    "Badalona",
+                    "Montgat",
+                    "Montgat Nord",
+                    "El Masnou",
+                    "Ocata",
+                    "Premià de Mar",
+                    "Vilassar de Mar",
+                    "Cabrera de Mar-Vilassar de Mar",
+                    "Mataró"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 38,
+                "endPk": 75.3,
+                "stations": [
+                    "Arenys de Mar",
+                    "Canet de Mar",
+                    "Sant Pol de Mar",
+                    "Calella",
+                    "Pineda de Mar",
+                    "Santa Susanna",
+                    "Malgrat de Mar",
+                    "Blanes",
+                    "Tordera",
+                    "Maçanet-Massanes"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R2S",
+        "stations": [
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Calafell",
+                "code": "71601"
+            },
+            {
+                "name": "Segur de Calafell",
+                "code": "71602"
+            },
+            {
+                "name": "Cunit",
+                "code": "71603"
+            },
+            {
+                "name": "Cubelles",
+                "code": "71604"
+            },
+            {
+                "name": "Vilanova i la Geltrú",
+                "code": "71700"
+            },
+            {
+                "name": "Sitges",
+                "code": "71701"
+            },
+            {
+                "name": "Garraf",
+                "code": "71703"
+            },
+            {
+                "name": "Platja de Castelldefels",
+                "code": "71704"
+            },
+            {
+                "name": "Castelldefels",
+                "code": "71705"
+            },
+            {
+                "name": "Gavà",
+                "code": "71706"
+            },
+            {
+                "name": "Viladecans",
+                "code": "71709"
+            },
+            {
+                "name": "El Prat de Llobregat",
+                "code": "71707"
+            },
+            {
+                "name": "Bellvitge | Gornal",
+                "code": "71708"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 24.1,
+                "endPk": 24.1,
+                "stations": [
+                    "Sant Vicenç de Calders"
+                ]
+            },
+            {
+                "line": "02200",
+                "startPk": 622,
+                "endPk": 685.4,
+                "stations": [
+                    "Calafell",
+                    "Segur de Calafell",
+                    "Cunit",
+                    "Cubelles",
+                    "Vilanova i la Geltrú",
+                    "Sitges",
+                    "Garraf",
+                    "Platja de Castelldefels",
+                    "Castelldefels",
+                    "Gavà",
+                    "Viladecans",
+                    "El Prat de Llobregat",
+                    "Bellvitge | Gornal",
+                    "Barcelona-Sants",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Estació de França"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R2",
+        "stations": [
+            {
+                "name": "Castelldefels",
+                "code": "71705"
+            },
+            {
+                "name": "Gavà",
+                "code": "71706"
+            },
+            {
+                "name": "Viladecans",
+                "code": "71709"
+            },
+            {
+                "name": "El Prat de Llobregat",
+                "code": "71707"
+            },
+            {
+                "name": "Bellvitge | Gornal",
+                "code": "71708"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-El Clot",
+                "code": "79009"
+            },
+            {
+                "name": "Barcelona-Sant Andreu",
+                "code": "78802"
+            },
+            {
+                "name": "Montcada i Reixac",
+                "code": "79005"
+            },
+            {
+                "name": "La Llagosta",
+                "code": "79011"
+            },
+            {
+                "name": "Mollet-Sant Fost",
+                "code": "79006"
+            },
+            {
+                "name": "Montmeló",
+                "code": "79007"
+            },
+            {
+                "name": "Granollers Centre",
+                "code": "79100"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 658.9,
+                "endPk": 682.3,
+                "stations": [
+                    "Castelldefels",
+                    "Gavà",
+                    "Viladecans",
+                    "El Prat de Llobregat",
+                    "Bellvitge | Gornal",
+                    "Barcelona-Sants",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-El Clot"
+                ]
+            },
+            {
+                "line": "02220",
+                "startPk": 361.7,
+                "endPk": 355.2,
+                "stations": [
+                    "Barcelona-Sant Andreu",
+                    "Montcada i Reixac"
+                ]
+            },
+            {
+                "line": "02270",
+                "startPk": 122,
+                "endPk": 135.3,
+                "stations": [
+                    "La Llagosta",
+                    "Mollet-Sant Fost",
+                    "Montmeló",
+                    "Granollers Centre"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R2N",
+        "stations": [
+            {
+                "name": "Aeroport",
+                "code": "72400"
+            },
+            {
+                "name": "El Prat de Llobregat",
+                "code": "71707"
+            },
+            {
+                "name": "Bellvitge | Gornal",
+                "code": "71708"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-El Clot",
+                "code": "79009"
+            },
+            {
+                "name": "Barcelona-Sant Andreu",
+                "code": "78802"
+            },
+            {
+                "name": "Montcada i Reixac",
+                "code": "79005"
+            },
+            {
+                "name": "La Llagosta",
+                "code": "79011"
+            },
+            {
+                "name": "Mollet-Sant Fost",
+                "code": "79006"
+            },
+            {
+                "name": "Montmeló",
+                "code": "79007"
+            },
+            {
+                "name": "Granollers Centre",
+                "code": "79100"
+            },
+            {
+                "name": "Les Franqueses-Granollers Nord",
+                "code": "79109"
+            },
+            {
+                "name": "Cardedeu",
+                "code": "79101"
+            },
+            {
+                "name": "Llinars del Vallès",
+                "code": "79102"
+            },
+            {
+                "name": "Palautordera",
+                "code": "79103"
+            },
+            {
+                "name": "Sant Celoni",
+                "code": "79104"
+            },
+            {
+                "name": "Gualba",
+                "code": "79105"
+            },
+            {
+                "name": "Riells i Viabrea-Breda",
+                "code": "79106"
+            },
+            {
+                "name": "Hostalric",
+                "code": "79107"
+            },
+            {
+                "name": "Maçanet-Massanes",
+                "code": "79200"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 667.9,
+                "endPk": 682.3,
+                "stations": [
+                    "Aeroport",
+                    "El Prat de Llobregat",
+                    "Bellvitge | Gornal",
+                    "Barcelona-Sants",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-El Clot"
+                ]
+            },
+            {
+                "line": "02220",
+                "startPk": 361.7,
+                "endPk": 355.2,
+                "stations": [
+                    "Barcelona-Sant Andreu",
+                    "Montcada i Reixac"
+                ]
+            },
+            {
+                "line": "02270",
+                "startPk": 122,
+                "endPk": 175.9,
+                "stations": [
+                    "La Llagosta",
+                    "Mollet-Sant Fost",
+                    "Montmeló",
+                    "Granollers Centre",
+                    "Les Franqueses-Granollers Nord",
+                    "Cardedeu",
+                    "Llinars del Vallès",
+                    "Palautordera",
+                    "Sant Celoni",
+                    "Gualba",
+                    "Riells i Viabrea-Breda",
+                    "Hostalric",
+                    "Maçanet-Massanes"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R3",
+        "stations": [
+            {
+                "name": "L'Hospitalet de Llobregat",
+                "code": "72305"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Plaça de Catalunya",
+                "code": "78805"
+            },
+            {
+                "name": "Barcelona-Arc de Triomf",
+                "code": "78804"
+            },
+            {
+                "name": "Barcelona-La Sagrera-Meridiana",
+                "code": "78806"
+            },
+            {
+                "name": "Barcelona-Fabra i Puig",
+                "code": "78802"
+            },
+            {
+                "name": "Barcelona-Torre Baró | Vallbona",
+                "code": "78801"
+            },
+            {
+                "name": "Montcada Bifurcació",
+                "code": "78800"
+            },
+            {
+                "name": "Montcada Ripollet",
+                "code": "77002"
+            },
+            {
+                "name": "Santa Perpètua de Mogoda La Florida",
+                "code": "77003"
+            },
+            {
+                "name": "Mollet-Santa Rosa",
+                "code": "77004"
+            },
+            {
+                "name": "Parets del Vallès",
+                "code": "77005"
+            },
+            {
+                "name": "Granollers-Canovelles",
+                "code": "77006"
+            },
+            {
+                "name": "Les Franqueses del Vallès",
+                "code": "77100"
+            },
+            {
+                "name": "La Garriga",
+                "code": "77102"
+            },
+            {
+                "name": "Figaró",
+                "code": "77103"
+            },
+            {
+                "name": "Sant Martí de Centelles",
+                "code": "77104"
+            },
+            {
+                "name": "Centelles",
+                "code": "77105"
+            },
+            {
+                "name": "Balenyà-Els Hostalets",
+                "code": "77106"
+            },
+            {
+                "name": "Balenyà-Tona-Seva",
+                "code": "77107"
+            },
+            {
+                "name": "Vic",
+                "code": "77109"
+            },
+            {
+                "name": "Manlleu",
+                "code": "77110"
+            },
+            {
+                "name": "Torelló",
+                "code": "77111"
+            },
+            {
+                "name": "Borgonyà",
+                "code": "77112"
+            },
+            {
+                "name": "Sant Quirze de Besora",
+                "code": "77113"
+            },
+            {
+                "name": "La Farga de Bebié",
+                "code": "77114"
+            },
+            {
+                "name": "Ripoll",
+                "code": "77200"
+            },
+            {
+                "name": "Campdevànol",
+                "code": "77301"
+            },
+            {
+                "name": "Ribes de Freser",
+                "code": "77303"
+            },
+            {
+                "name": "Planoles",
+                "code": "77304"
+            },
+            {
+                "name": "Toses",
+                "code": "77305"
+            },
+            {
+                "name": "La Molina",
+                "code": "77306"
+            },
+            {
+                "name": "Urtx-Alp",
+                "code": "77307"
+            },
+            {
+                "name": "Puigcerdà",
+                "code": "77309"
+            },
+            {
+                "name": "La Tor de Querol-Enveig",
+                "code": "77310"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 95.2,
+                "endPk": 95.2,
+                "stations": [
+                    "L'Hospitalet de Llobregat"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 99.3,
+                "endPk": 106.5,
+                "stations": [
+                    "Barcelona-Sants",
+                    "Barcelona-Plaça de Catalunya",
+                    "Barcelona-Arc de Triomf",
+                    "Barcelona-La Sagrera-Meridiana",
+                    "Barcelona-Fabra i Puig"
+                ]
+            },
+            {
+                "line": "02220",
+                "startPk": 357.7,
+                "endPk": 354.2,
+                "stations": [
+                    "Barcelona-Torre Baró | Vallbona",
+                    "Montcada Bifurcació",
+                    "Montcada Ripollet"
+                ]
+            },
+            {
+                "line": "02222",
+                "startPk": 15,
+                "endPk": 52.3,
+                "stations": [
+                    "Santa Perpètua de Mogoda La Florida",
+                    "Mollet-Santa Rosa",
+                    "Parets del Vallès",
+                    "Granollers-Canovelles",
+                    "Les Franqueses del Vallès",
+                    "La Garriga",
+                    "Figaró",
+                    "Sant Martí de Centelles",
+                    "Centelles",
+                    "Balenyà-Els Hostalets",
+                    "Balenyà-Tona-Seva",
+                    "Vic",
+                    "Manlleu",
+                    "Torelló",
+                    "Borgonyà",
+                    "Sant Quirze de Besora",
+                    "La Farga de Bebié",
+                    "Ripoll",
+                    "Campdevànol",
+                    "Ribes de Freser",
+                    "Planoles",
+                    "Toses",
+                    "La Molina",
+                    "Urtx-Alp",
+                    "Puigcerdà",
+                    "La Tor de Querol-Enveig"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R4",
+        "stations": [
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "El Vendrell",
+                "code": "72201"
+            },
+            {
+                "name": "L'Arboç",
+                "code": "72202"
+            },
+            {
+                "name": "Els Monjos",
+                "code": "72203"
+            },
+            {
+                "name": "Vilafranca del Penedès",
+                "code": "72204"
+            },
+            {
+                "name": "La Granada",
+                "code": "72205"
+            },
+            {
+                "name": "Lavern-Subirats",
+                "code": "72206"
+            },
+            {
+                "name": "Sant Sadurní d'Anoia",
+                "code": "72207"
+            },
+            {
+                "name": "Gelida",
+                "code": "72208"
+            },
+            {
+                "name": "Martorell Central",
+                "code": "72209"
+            },
+            {
+                "name": "Castellbisbal",
+                "code": "72210"
+            },
+            {
+                "name": "El Papiol",
+                "code": "72211"
+            },
+            {
+                "name": "Molins de Rei",
+                "code": "72300"
+            },
+            {
+                "name": "Sant Feliu de Llobregat",
+                "code": "72301"
+            },
+            {
+                "name": "Sant Joan Despí",
+                "code": "72302"
+            },
+            {
+                "name": "Cornellà",
+                "code": "72303"
+            },
+            {
+                "name": "L'Hospitalet de Llobregat",
+                "code": "72305"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Plaça de Catalunya",
+                "code": "78805"
+            },
+            {
+                "name": "Barcelona-Arc de Triomf",
+                "code": "78804"
+            },
+            {
+                "name": "Barcelona-La Sagrera-Meridiana",
+                "code": "78806"
+            },
+            {
+                "name": "Barcelona-Fabra i Puig",
+                "code": "78802"
+            },
+            {
+                "name": "Barcelona-Torre Baró | Vallbona",
+                "code": "78801"
+            },
+            {
+                "name": "Montcada Bifurcació",
+                "code": "78800"
+            },
+            {
+                "name": "Montcada i Reixac-Manresa",
+                "code": "78708"
+            },
+            {
+                "name": "Montcada i Reixac-Santa Maria",
+                "code": "78707"
+            },
+            {
+                "name": "Cerdanyola del Vallès",
+                "code": "78706"
+            },
+            {
+                "name": "Barberà del Vallès",
+                "code": "78705"
+            },
+            {
+                "name": "Sabadell Sud",
+                "code": "78703"
+            },
+            {
+                "name": "Sabadell Centre",
+                "code": "78704"
+            },
+            {
+                "name": "Sabadell Nord",
+                "code": "78709"
+            },
+            {
+                "name": "Terrassa Est",
+                "code": "78710"
+            },
+            {
+                "name": "Terrassa Estació del Nord",
+                "code": "78700"
+            },
+            {
+                "name": "Sant Miquel de Gonteres-Viladecavalls",
+                "code": "78610"
+            },
+            {
+                "name": "Viladecavalls",
+                "code": "78609"
+            },
+            {
+                "name": "Vacarisses-Torreblanca",
+                "code": "78607"
+            },
+            {
+                "name": "Vacarisses",
+                "code": "78606"
+            },
+            {
+                "name": "Castellbell i el Vilar-Monistrol de Mont",
+                "code": "78605"
+            },
+            {
+                "name": "Sant Vicenç de Castellet",
+                "code": "78604"
+            },
+            {
+                "name": "Manresa",
+                "code": "78600"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 24.1,
+                "endPk": 95.2,
+                "stations": [
+                    "Sant Vicenç de Calders",
+                    "El Vendrell",
+                    "L'Arboç",
+                    "Els Monjos",
+                    "Vilafranca del Penedès",
+                    "La Granada",
+                    "Lavern-Subirats",
+                    "Sant Sadurní d'Anoia",
+                    "Gelida",
+                    "Martorell Central",
+                    "Castellbisbal",
+                    "El Papiol",
+                    "Molins de Rei",
+                    "Sant Feliu de Llobregat",
+                    "Sant Joan Despí",
+                    "Cornellà",
+                    "L'Hospitalet de Llobregat"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 99.3,
+                "endPk": 106.5,
+                "stations": [
+                    "Barcelona-Sants",
+                    "Barcelona-Plaça de Catalunya",
+                    "Barcelona-Arc de Triomf",
+                    "Barcelona-La Sagrera-Meridiana",
+                    "Barcelona-Fabra i Puig"
+                ]
+            },
+            {
+                "line": "02220",
+                "startPk": 357.7,
+                "endPk": 301.7,
+                "stations": [
+                    "Barcelona-Torre Baró | Vallbona",
+                    "Montcada Bifurcació",
+                    "Montcada i Reixac-Manresa",
+                    "Montcada i Reixac-Santa Maria",
+                    "Cerdanyola del Vallès",
+                    "Barberà del Vallès",
+                    "Sabadell Sud",
+                    "Sabadell Centre",
+                    "Sabadell Nord",
+                    "Terrassa Est",
+                    "Terrassa Estació del Nord",
+                    "Sant Miquel de Gonteres-Viladecavalls",
+                    "Viladecavalls",
+                    "Vacarisses-Torreblanca",
+                    "Vacarisses",
+                    "Castellbell i el Vilar-Monistrol de Mont",
+                    "Sant Vicenç de Castellet",
+                    "Manresa"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R7",
+        "stations": [
+            {
+                "name": "Barcelona-Fabra i Puig",
+                "code": "78802"
+            },
+            {
+                "name": "Barcelona-Torre Baró | Vallbona",
+                "code": "78801"
+            },
+            {
+                "name": "Montcada Bifurcació",
+                "code": "78800"
+            },
+            {
+                "name": "Montcada i Reixac-Manresa",
+                "code": "78708"
+            },
+            {
+                "name": "Montcada i Reixac-Santa Maria",
+                "code": "78707"
+            },
+            {
+                "name": "Cerdanyola del Vallès",
+                "code": "78706"
+            },
+            {
+                "name": "Cerdanyola-Universitat",
+                "code": "72503"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02220",
+                "startPk": 361.7,
+                "endPk": 348.7,
+                "stations": [
+                    "Barcelona-Fabra i Puig",
+                    "Barcelona-Torre Baró | Vallbona",
+                    "Montcada Bifurcació",
+                    "Montcada i Reixac-Manresa",
+                    "Montcada i Reixac-Santa Maria",
+                    "Cerdanyola del Vallès",
+                    "Cerdanyola-Universitat"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R8",
+        "stations": [
+            {
+                "name": "Martorell Central",
+                "code": "72209"
+            },
+            {
+                "name": "Castellbisbal",
+                "code": "72210"
+            },
+            {
+                "name": "Rubí Can Vallhonrat",
+                "code": "72501"
+            },
+            {
+                "name": "Sant Cugat Coll Favà",
+                "code": "72502"
+            },
+            {
+                "name": "Cerdanyola-Universitat",
+                "code": "72503"
+            },
+            {
+                "name": "Santa Perpètua de Mogoda Riera de Caldes",
+                "code": "77003"
+            },
+            {
+                "name": "Mollet-Sant Fost",
+                "code": "79006"
+            },
+            {
+                "name": "Montmeló",
+                "code": "79007"
+            },
+            {
+                "name": "Granollers Centre",
+                "code": "79100"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 73.2,
+                "endPk": 76.8,
+                "stations": [
+                    "Martorell Central",
+                    "Castellbisbal"
+                ]
+            },
+            {
+                "line": "02246",
+                "startPk": 6.8,
+                "endPk": 23.5,
+                "stations": [
+                    "Rubí Can Vallhonrat",
+                    "Sant Cugat Coll Favà",
+                    "Cerdanyola-Universitat",
+                    "Santa Perpètua de Mogoda Riera de Caldes",
+                    "Mollet-Sant Fost"
+                ]
+            },
+            {
+                "line": "02270",
+                "startPk": 128,
+                "endPk": 135.3,
+                "stations": [
+                    "Montmeló",
+                    "Granollers Centre"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R11",
+        "stations": [
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-El Clot",
+                "code": "79009"
+            },
+            {
+                "name": "Barcelona-Sant Andreu",
+                "code": "78802"
+            },
+            {
+                "name": "Granollers Centre",
+                "code": "79100"
+            },
+            {
+                "name": "Sant Celoni",
+                "code": "79104"
+            },
+            {
+                "name": "Gualba",
+                "code": "79105"
+            },
+            {
+                "name": "Riells i Viabrea-Breda",
+                "code": "79106"
+            },
+            {
+                "name": "Hostalric",
+                "code": "79107"
+            },
+            {
+                "name": "Maçanet-Massanes",
+                "code": "79200"
+            },
+            {
+                "name": "Sils",
+                "code": "79202"
+            },
+            {
+                "name": "Caldes de Malavella",
+                "code": "79203"
+            },
+            {
+                "name": "Riudellots",
+                "code": "79204"
+            },
+            {
+                "name": "Fornells de la Selva",
+                "code": "79205"
+            },
+            {
+                "name": "Girona",
+                "code": "79300"
+            },
+            {
+                "name": "Celrà",
+                "code": "79301"
+            },
+            {
+                "name": "Bordils-Juià",
+                "code": "79302"
+            },
+            {
+                "name": "Flaçà",
+                "code": "79303"
+            },
+            {
+                "name": "Sant Jordi Desvalls",
+                "code": "79304"
+            },
+            {
+                "name": "Camallera",
+                "code": "79305"
+            },
+            {
+                "name": "Sant Miquel de Fluvià",
+                "code": "79306"
+            },
+            {
+                "name": "Vilamalla",
+                "code": "79308"
+            },
+            {
+                "name": "Figueres",
+                "code": "79309"
+            },
+            {
+                "name": "Vilajuïga",
+                "code": "79311"
+            },
+            {
+                "name": "Llançà",
+                "code": "79312"
+            },
+            {
+                "name": "Colera",
+                "code": "79314"
+            },
+            {
+                "name": "Portbou",
+                "code": "79315"
+            },
+            {
+                "name": "Cerbère",
+                "code": "79316"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02276",
+                "startPk": 99.3,
+                "endPk": 106.5,
+                "stations": [
+                    "Barcelona-Sants",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-El Clot",
+                    "Barcelona-Sant Andreu"
+                ]
+            },
+            {
+                "line": "02270",
+                "startPk": 135.3,
+                "endPk": 275.3,
+                "stations": [
+                    "Granollers Centre",
+                    "Sant Celoni",
+                    "Gualba",
+                    "Riells i Viabrea-Breda",
+                    "Hostalric",
+                    "Maçanet-Massanes",
+                    "Sils",
+                    "Caldes de Malavella",
+                    "Riudellots",
+                    "Fornells de la Selva",
+                    "Girona",
+                    "Celrà",
+                    "Bordils-Juià",
+                    "Flaçà",
+                    "Sant Jordi Desvalls",
+                    "Camallera",
+                    "Sant Miquel de Fluvià",
+                    "Vilamalla",
+                    "Figueres",
+                    "Vilajuïga",
+                    "Llançà",
+                    "Colera",
+                    "Portbou",
+                    "Cerbère"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R13",
+        "stations": [
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Roda de Mar",
+                "code": "72101"
+            },
+            {
+                "name": "Salomó",
+                "code": "76001"
+            },
+            {
+                "name": "Vilabella",
+                "code": "76002"
+            },
+            {
+                "name": "Nulles-Bràfim",
+                "code": "76003"
+            },
+            {
+                "name": "Valls",
+                "code": "76004"
+            },
+            {
+                "name": "La Plana-Picamoixons",
+                "code": "73100"
+            },
+            {
+                "name": "La Riba",
+                "code": "73010"
+            },
+            {
+                "name": "Vilaverd",
+                "code": "73009"
+            },
+            {
+                "name": "Montblanc",
+                "code": "73008"
+            },
+            {
+                "name": "L'Espluga de Francolí",
+                "code": "73007"
+            },
+            {
+                "name": "Vimbodí",
+                "code": "73006"
+            },
+            {
+                "name": "Vinaixa",
+                "code": "73005"
+            },
+            {
+                "name": "La Floresta",
+                "code": "73004"
+            },
+            {
+                "name": "Les Borges Blanques",
+                "code": "73003"
+            },
+            {
+                "name": "Juneda",
+                "code": "73002"
+            },
+            {
+                "name": "Lleida-Pirineus",
+                "code": "78400"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 685.4,
+                "endPk": 0,
+                "stations": [
+                    "Barcelona-Estació de França",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Sants",
+                    "Sant Vicenç de Calders",
+                    "Roda de Mar",
+                    "Salomó",
+                    "Vilabella",
+                    "Nulles-Bràfim",
+                    "Valls",
+                    "La Plana-Picamoixons",
+                    "La Riba",
+                    "Vilaverd",
+                    "Montblanc",
+                    "L'Espluga de Francolí",
+                    "Vimbodí",
+                    "Vinaixa",
+                    "La Floresta",
+                    "Les Borges Blanques",
+                    "Juneda",
+                    "Lleida-Pirineus"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R14",
+        "stations": [
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Torredembarra",
+                "code": "71503"
+            },
+            {
+                "name": "Altafulla-Tamarit",
+                "code": "71502"
+            },
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Vila-seca",
+                "code": "71401"
+            },
+            {
+                "name": "Reus",
+                "code": "71400"
+            },
+            {
+                "name": "La Selva del Camp",
+                "code": "73102"
+            },
+            {
+                "name": "Alcover",
+                "code": "73101"
+            },
+            {
+                "name": "La Plana-Picamoixons",
+                "code": "73100"
+            },
+            {
+                "name": "La Riba",
+                "code": "73010"
+            },
+            {
+                "name": "Vilaverd",
+                "code": "73009"
+            },
+            {
+                "name": "Montblanc",
+                "code": "73008"
+            },
+            {
+                "name": "L'Espluga de Francolí",
+                "code": "73007"
+            },
+            {
+                "name": "Vimbodí",
+                "code": "73006"
+            },
+            {
+                "name": "Vinaixa",
+                "code": "73005"
+            },
+            {
+                "name": "La Floresta",
+                "code": "73004"
+            },
+            {
+                "name": "Les Borges Blanques",
+                "code": "73003"
+            },
+            {
+                "name": "Juneda",
+                "code": "73002"
+            },
+            {
+                "name": "Puigverd de Lleida-Artesa de Lleida",
+                "code": "73001"
+            },
+            {
+                "name": "Lleida-Pirineus",
+                "code": "78400"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 685.4,
+                "endPk": 618,
+                "stations": [
+                    "Barcelona-Estació de França",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Sants",
+                    "Sant Vicenç de Calders"
+                ]
+            },
+            {
+                "line": "02210",
+                "startPk": 14,
+                "endPk": 85.3,
+                "stations": [
+                    "Torredembarra",
+                    "Altafulla-Tamarit",
+                    "Tarragona",
+                    "Vila-seca",
+                    "Reus"
+                ]
+            },
+            {
+                "line": "02200",
+                "startPk": 0,
+                "endPk": 0,
+                "stations": [
+                    "La Plana-Picamoixons",
+                    "La Riba",
+                    "Vilaverd",
+                    "Montblanc",
+                    "L'Espluga de Francolí",
+                    "Vimbodí",
+                    "Vinaixa",
+                    "La Floresta",
+                    "Les Borges Blanques",
+                    "Juneda",
+                    "Puigverd de Lleida-Artesa de Lleida",
+                    "Lleida-Pirineus"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R15",
+        "stations": [
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Torredembarra",
+                "code": "71503"
+            },
+            {
+                "name": "Altafulla-Tamarit",
+                "code": "71502"
+            },
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Vila-seca",
+                "code": "71401"
+            },
+            {
+                "name": "Reus",
+                "code": "71400"
+            },
+            {
+                "name": "Les Borges del Camp",
+                "code": "71307"
+            },
+            {
+                "name": "Riudecanyes-Botarell",
+                "code": "71306"
+            },
+            {
+                "name": "Duesaigües-L'Argentera",
+                "code": "71305"
+            },
+            {
+                "name": "Pradell",
+                "code": "71304"
+            },
+            {
+                "name": "Marçà-Falset",
+                "code": "71303"
+            },
+            {
+                "name": "Capçanes",
+                "code": "71302"
+            },
+            {
+                "name": "Móra la Nova",
+                "code": "71300"
+            },
+            {
+                "name": "Ascó",
+                "code": "71211"
+            },
+            {
+                "name": "Flix",
+                "code": "71210"
+            },
+            {
+                "name": "Riba-roja d'Ebre",
+                "code": "71209"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 685.4,
+                "endPk": 618,
+                "stations": [
+                    "Barcelona-Estació de França",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Sants",
+                    "Sant Vicenç de Calders"
+                ]
+            },
+            {
+                "line": "02210",
+                "startPk": 14,
+                "endPk": 503.2,
+                "stations": [
+                    "Torredembarra",
+                    "Altafulla-Tamarit",
+                    "Tarragona",
+                    "Vila-seca",
+                    "Reus",
+                    "Les Borges del Camp",
+                    "Riudecanyes-Botarell",
+                    "Duesaigües-L'Argentera",
+                    "Pradell",
+                    "Marçà-Falset",
+                    "Capçanes",
+                    "Móra la Nova",
+                    "Ascó",
+                    "Flix",
+                    "Riba-roja d'Ebre"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R16",
+        "stations": [
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Vilanova i la Geltrú",
+                "code": "71700"
+            },
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Torredembarra",
+                "code": "71503"
+            },
+            {
+                "name": "Altafulla-Tamarit",
+                "code": "71502"
+            },
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Vila-seca",
+                "code": "71401"
+            },
+            {
+                "name": "Cambrils",
+                "code": "65409"
+            },
+            {
+                "name": "L'Hospitalet de l'Infant",
+                "code": "60420"
+            },
+            {
+                "name": "L'Ametlla de Mar",
+                "code": "65405"
+            },
+            {
+                "name": "L'Ampolla-Perelló-Deltebre",
+                "code": "65404"
+            },
+            {
+                "name": "Camarles-Deltebre",
+                "code": "65403"
+            },
+            {
+                "name": "L'Aldea-Amposta",
+                "code": "65402"
+            },
+            {
+                "name": "Camp-redó",
+                "code": "65401"
+            },
+            {
+                "name": "Tortosa",
+                "code": "65400"
+            },
+            {
+                "name": "Ulldecona-Alcanar-La Sénia",
+                "code": "65314"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 685.4,
+                "endPk": 618,
+                "stations": [
+                    "Barcelona-Estació de França",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Sants",
+                    "Vilanova i la Geltrú",
+                    "Sant Vicenç de Calders"
+                ]
+            },
+            {
+                "line": "02210",
+                "startPk": 14,
+                "endPk": 94.3,
+                "stations": [
+                    "Torredembarra",
+                    "Altafulla-Tamarit",
+                    "Tarragona",
+                    "Vila-seca"
+                ]
+            },
+            {
+                "line": "03600",
+                "startPk": 242.1,
+                "endPk": 242.1,
+                "stations": [
+                    "Cambrils"
+                ]
+            },
+            {
+                "line": "03600",
+                "startPk": 210.2,
+                "endPk": 185.2,
+                "stations": [
+                    "L'Ametlla de Mar",
+                    "L'Ampolla-Perelló-Deltebre",
+                    "Camarles-Deltebre",
+                    "L'Aldea-Amposta"
+                ]
+            },
+            {
+                "line": "03600",
+                "startPk": 162.2,
+                "endPk": 162.2,
+                "stations": [
+                    "Ulldecona-Alcanar-La Sénia"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "R17",
+        "stations": [
+            {
+                "name": "Barcelona-Estació de França",
+                "code": "79400"
+            },
+            {
+                "name": "Barcelona-Passeig de Gràcia",
+                "code": "71802"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Vilanova i la Geltrú",
+                "code": "71700"
+            },
+            {
+                "name": "Sant Vicenç de Calders",
+                "code": "71600"
+            },
+            {
+                "name": "Torredembarra",
+                "code": "71503"
+            },
+            {
+                "name": "Altafulla-Tamarit",
+                "code": "71502"
+            },
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Salou - Port Aventura",
+                "code": "65411"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02200",
+                "startPk": 685.4,
+                "endPk": 618,
+                "stations": [
+                    "Barcelona-Estació de França",
+                    "Barcelona-Passeig de Gràcia",
+                    "Barcelona-Sants",
+                    "Vilanova i la Geltrú",
+                    "Sant Vicenç de Calders"
+                ]
+            },
+            {
+                "line": "02210",
+                "startPk": 14,
+                "endPk": 103.5,
+                "stations": [
+                    "Torredembarra",
+                    "Altafulla-Tamarit",
+                    "Tarragona"
+                ]
+            },
+            {
+                "line": "02630",
+                "startPk": 265.6,
+                "endPk": 265.6,
+                "stations": [
+                    "Salou - Port Aventura"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "RG1",
+        "stations": [
+            {
+                "name": "L'Hospitalet de Llobregat",
+                "code": "72305"
+            },
+            {
+                "name": "Barcelona-Sants",
+                "code": "71801"
+            },
+            {
+                "name": "Barcelona-Plaça de Catalunya",
+                "code": "78805"
+            },
+            {
+                "name": "Barcelona-Arc de Triomf",
+                "code": "78804"
+            },
+            {
+                "name": "Barcelona-El Clot",
+                "code": "79009"
+            },
+            {
+                "name": "Sant Adrià de Besòs",
+                "code": "79403"
+            },
+            {
+                "name": "Badalona",
+                "code": "79404"
+            },
+            {
+                "name": "Montgat",
+                "code": "79405"
+            },
+            {
+                "name": "Montgat Nord",
+                "code": "79406"
+            },
+            {
+                "name": "El Masnou",
+                "code": "79407"
+            },
+            {
+                "name": "Ocata",
+                "code": "79408"
+            },
+            {
+                "name": "Premià de Mar",
+                "code": "79409"
+            },
+            {
+                "name": "Vilassar de Mar",
+                "code": "79410"
+            },
+            {
+                "name": "Cabrera de Mar-Vilassar de Mar",
+                "code": "79412"
+            },
+            {
+                "name": "Mataró",
+                "code": "79500"
+            },
+            {
+                "name": "Sant Andreu de Llavaneres",
+                "code": "79501"
+            },
+            {
+                "name": "Caldes d'Estrac",
+                "code": "79502"
+            },
+            {
+                "name": "Arenys de Mar",
+                "code": "79600"
+            },
+            {
+                "name": "Canet de Mar",
+                "code": "79601"
+            },
+            {
+                "name": "Sant Pol de Mar",
+                "code": "79602"
+            },
+            {
+                "name": "Calella",
+                "code": "79603"
+            },
+            {
+                "name": "Pineda de Mar",
+                "code": "79604"
+            },
+            {
+                "name": "Santa Susanna",
+                "code": "79608"
+            },
+            {
+                "name": "Malgrat de Mar",
+                "code": "79605"
+            },
+            {
+                "name": "Blanes",
+                "code": "79606"
+            },
+            {
+                "name": "Tordera",
+                "code": "79607"
+            },
+            {
+                "name": "Maçanet-Massanes",
+                "code": "79200"
+            },
+            {
+                "name": "Sils",
+                "code": "79202"
+            },
+            {
+                "name": "Caldes de Malavella",
+                "code": "79203"
+            },
+            {
+                "name": "Riudellots",
+                "code": "79204"
+            },
+            {
+                "name": "Fornells de la Selva",
+                "code": "79205"
+            },
+            {
+                "name": "Girona",
+                "code": "79300"
+            },
+            {
+                "name": "Celrà",
+                "code": "79301"
+            },
+            {
+                "name": "Bordils-Juià",
+                "code": "79302"
+            },
+            {
+                "name": "Flaçà",
+                "code": "79303"
+            },
+            {
+                "name": "Sant Jordi Desvalls",
+                "code": "79304"
+            },
+            {
+                "name": "Camallera",
+                "code": "79305"
+            },
+            {
+                "name": "Sant Miquel de Fluvià",
+                "code": "79306"
+            },
+            {
+                "name": "Vilamalla",
+                "code": "79308"
+            },
+            {
+                "name": "Figueres",
+                "code": "79309"
+            },
+            {
+                "name": "Vilajuïga",
+                "code": "79311"
+            },
+            {
+                "name": "Llançà",
+                "code": "79312"
+            },
+            {
+                "name": "Colera",
+                "code": "79314"
+            },
+            {
+                "name": "Portbou",
+                "code": "79315"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02240",
+                "startPk": 95.2,
+                "endPk": 95.2,
+                "stations": [
+                    "L'Hospitalet de Llobregat"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 99.3,
+                "endPk": 133.1,
+                "stations": [
+                    "Barcelona-Sants",
+                    "Barcelona-Plaça de Catalunya",
+                    "Barcelona-Arc de Triomf",
+                    "Barcelona-El Clot",
+                    "Sant Adrià de Besòs",
+                    "Badalona",
+                    "Montgat",
+                    "Montgat Nord",
+                    "El Masnou",
+                    "Ocata",
+                    "Premià de Mar",
+                    "Vilassar de Mar",
+                    "Cabrera de Mar-Vilassar de Mar",
+                    "Mataró"
+                ]
+            },
+            {
+                "line": "02276",
+                "startPk": 38,
+                "endPk": 75.3,
+                "stations": [
+                    "Arenys de Mar",
+                    "Canet de Mar",
+                    "Sant Pol de Mar",
+                    "Calella",
+                    "Pineda de Mar",
+                    "Santa Susanna",
+                    "Malgrat de Mar",
+                    "Blanes",
+                    "Tordera",
+                    "Maçanet-Massanes"
+                ]
+            },
+            {
+                "line": "02270",
+                "startPk": 183.9,
+                "endPk": 273.1,
+                "stations": [
+                    "Sils",
+                    "Caldes de Malavella",
+                    "Riudellots",
+                    "Fornells de la Selva",
+                    "Girona",
+                    "Celrà",
+                    "Bordils-Juià",
+                    "Flaçà",
+                    "Sant Jordi Desvalls",
+                    "Camallera",
+                    "Sant Miquel de Fluvià",
+                    "Vilamalla",
+                    "Figueres",
+                    "Vilajuïga",
+                    "Llançà",
+                    "Colera",
+                    "Portbou"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "RT1",
+        "stations": [
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Vila-seca",
+                "code": "71401"
+            },
+            {
+                "name": "Reus",
+                "code": "71400"
+            },
+            {
+                "name": "La Selva del Camp",
+                "code": "73102"
+            },
+            {
+                "name": "Alcover",
+                "code": "73101"
+            },
+            {
+                "name": "La Plana-Picamoixons",
+                "code": "73100"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02210",
+                "startPk": 103.5,
+                "endPk": 85.3,
+                "stations": [
+                    "Tarragona",
+                    "Vila-seca",
+                    "Reus"
+                ]
+            },
+            {
+                "line": "02200",
+                "startPk": 0,
+                "endPk": 0,
+                "stations": [
+                    "La Plana-Picamoixons"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "RT2",
+        "stations": [
+            {
+                "name": "Tarragona",
+                "code": "71500"
+            },
+            {
+                "name": "Salou - Port Aventura",
+                "code": "65411"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02210",
+                "startPk": 103.5,
+                "endPk": 103.5,
+                "stations": [
+                    "Tarragona"
+                ]
+            },
+            {
+                "line": "02630",
+                "startPk": 265.6,
+                "endPk": 265.6,
+                "stations": [
+                    "Salou - Port Aventura"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "RL3",
+        "stations": [
+            {
+                "name": "Cervera",
+                "code": "78500"
+            },
+            {
+                "name": "Tàrrega",
+                "code": "78408"
+            },
+            {
+                "name": "Anglesola",
+                "code": "78407"
+            },
+            {
+                "name": "Bellpuig",
+                "code": "78406"
+            },
+            {
+                "name": "Castellnou de Seana",
+                "code": "78405"
+            },
+            {
+                "name": "Golmés",
+                "code": "78404"
+            },
+            {
+                "name": "Mollerussa",
+                "code": "78403"
+            },
+            {
+                "name": "Bell-lloc d'Urgell",
+                "code": "78402"
+            },
+            {
+                "name": "Lleida-Pirineus",
+                "code": "78400"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02220",
+                "startPk": 240.1,
+                "endPk": 183.6,
+                "stations": [
+                    "Cervera",
+                    "Tàrrega",
+                    "Anglesola",
+                    "Bellpuig",
+                    "Castellnou de Seana",
+                    "Golmés",
+                    "Mollerussa",
+                    "Bell-lloc d'Urgell",
+                    "Lleida-Pirineus"
+                ]
+            }
+        ]
+    },
+    {
+        "line": "RL4",
+        "stations": [
+            {
+                "name": "Terrassa Estació del Nord",
+                "code": "78700"
+            },
+            {
+                "name": "Sant Vicenç de Castellet",
+                "code": "78604"
+            },
+            {
+                "name": "Manresa",
+                "code": "78600"
+            },
+            {
+                "name": "Rajadell",
+                "code": "78506"
+            },
+            {
+                "name": "Aguilar de Segarra",
+                "code": "78505"
+            },
+            {
+                "name": "Seguers-Sant Pere Sallavinera",
+                "code": "78504"
+            },
+            {
+                "name": "Calaf",
+                "code": "78503"
+            },
+            {
+                "name": "Sant Martí Sesgueioles",
+                "code": "78502"
+            },
+            {
+                "name": "Sant Guim de Freixenet",
+                "code": "78501"
+            },
+            {
+                "name": "Cervera",
+                "code": "78500"
+            },
+            {
+                "name": "Tàrrega",
+                "code": "78408"
+            },
+            {
+                "name": "Anglesola",
+                "code": "78407"
+            },
+            {
+                "name": "Bellpuig",
+                "code": "78406"
+            },
+            {
+                "name": "Castellnou de Seana",
+                "code": "78405"
+            },
+            {
+                "name": "Golmés",
+                "code": "78404"
+            },
+            {
+                "name": "Mollerussa",
+                "code": "78403"
+            },
+            {
+                "name": "Bell-lloc d'Urgell",
+                "code": "78402"
+            },
+            {
+                "name": "Lleida-Pirineus",
+                "code": "78400"
+            }
+        ],
+        "trackLines": [
+            {
+                "line": "02220",
+                "startPk": 333.7,
+                "endPk": 183.6,
+                "stations": [
+                    "Terrassa Estació del Nord",
+                    "Sant Vicenç de Castellet",
+                    "Manresa",
+                    "Rajadell",
+                    "Aguilar de Segarra",
+                    "Seguers-Sant Pere Sallavinera",
+                    "Calaf",
+                    "Sant Martí Sesgueioles",
+                    "Sant Guim de Freixenet",
+                    "Cervera",
+                    "Tàrrega",
+                    "Anglesola",
+                    "Bellpuig",
+                    "Castellnou de Seana",
+                    "Golmés",
+                    "Mollerussa",
+                    "Bell-lloc d'Urgell",
+                    "Lleida-Pirineus"
+                ]
+            }
+        ]
+    }
+]
