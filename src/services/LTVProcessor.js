@@ -10,7 +10,18 @@ const StationService = require('./StationService');
 const GeoDataService = require('./GeoDataService');
 const StatsService = require('./StatsService');
 
+const LINE_PK_TRANSFORMS = {
+    // Line 230 (Picamoixons-Reus) uses a decreasing PK system (68.6 down to 0) in WFS,
+    // while DSLTV documents use an increasing system inherited from Line 200.
+    // Origin at Picamoixons is PK 68.61.
+    '230': (pk) => 137.22 - pk
+};
+
 class LTVProcessor {
+    constructor() {
+        this.geoCache = {};
+    }
+
     async convertToJson() {
         console.log('Migrating PDFs to JSONs...');
         const files = fs.readdirSync(Config.PDF_DIR)
@@ -104,41 +115,64 @@ class LTVProcessor {
         let wfsResolved = 0;
         let wfsFailed = 0;
 
-        const lineNumbers = new Set();
+        // Pre-group entries by line number for efficiency
+        const groupedByLine = {};
         for (const lineName in ltvData) {
             const match = lineName.match(/LÍNEA\s+(\d+)/);
-            if (match) lineNumbers.add(match[1]);
+            if (match) {
+                const ln = match[1];
+                if (!groupedByLine[ln]) groupedByLine[ln] = [];
+                groupedByLine[ln].push({ name: lineName, records: ltvData[lineName] });
+            }
         }
 
-        for (const lineNum of lineNumbers) {
+        for (const lineNum in groupedByLine) {
             const allTramos = await AdifWfsClient.fetchLineTramos(lineNum);
-            if (allTramos.length === 0) continue;
+            if (allTramos.length === 0) {
+                wfsFailed += groupedByLine[lineNum].reduce((sum, g) => sum + g.records.length, 0);
+                continue;
+            }
 
-            // Ensure tramos have geo info for disambiguation
-            allTramos.forEach(t => GeoDataService.enrichTramoWithGeo(t));
-
-            for (const lineName in ltvData) {
-                if (!lineName.includes(`LÍNEA ${lineNum}`)) continue;
-
-                for (const record of ltvData[lineName]) {
-                    const startKm = parseFloat(record.startKm);
-                    const endKm = parseFloat(record.endKm);
+            for (const group of groupedByLine[lineNum]) {
+                for (const record of group.records) {
+                    let startKm = parseFloat(record.startKm);
+                    let endKm = parseFloat(record.endKm);
                     if (isNaN(startKm)) continue;
 
-                    const minPk = Math.min(startKm, isNaN(endKm) ? startKm : endKm);
-                    const maxPk = Math.max(startKm, isNaN(endKm) ? startKm : endKm);
-                    const TOLERANCE = 1.0;
+                    let currentStartKm = startKm;
+                    let currentEndKm = endKm;
+                    let pkTransformed = false;
 
-                    let candidates = allTramos.filter(t => {
-                        const minT = Math.min(t.pki, t.pkd);
-                        const maxT = Math.max(t.pki, t.pkd);
-                        return (maxPk >= minT - TOLERANCE) && (minPk <= maxT + TOLERANCE);
-                    });
+                    const findCandidates = (s, e) => {
+                        const minP = Math.min(s, isNaN(e) ? s : e);
+                        const maxP = Math.max(s, isNaN(e) ? s : e);
+                        const TOLERANCE = 1.0;
+                        return allTramos.filter(t => {
+                            const minT = Math.min(t.pki, t.pkd);
+                            const maxT = Math.max(t.pki, t.pkd);
+                            return (maxP >= minT - TOLERANCE) && (minP <= maxT + TOLERANCE);
+                        });
+                    };
+
+                    let candidates = findCandidates(currentStartKm, currentEndKm);
+
+                    if (candidates.length === 0 && LINE_PK_TRANSFORMS[lineNum]) {
+                        currentStartKm = LINE_PK_TRANSFORMS[lineNum](startKm);
+                        currentEndKm = isNaN(endKm) ? NaN : LINE_PK_TRANSFORMS[lineNum](endKm);
+                        candidates = findCandidates(currentStartKm, currentEndKm);
+                        if (candidates.length > 0) {
+                            pkTransformed = true;
+                        }
+                    }
 
                     if (candidates.length === 0) {
                         wfsFailed++;
                         continue;
                     }
+
+                    const minPk = Math.min(currentStartKm, isNaN(currentEndKm) ? currentStartKm : currentEndKm);
+                    const maxPk = Math.max(currentStartKm, isNaN(currentEndKm) ? currentStartKm : currentEndKm);
+                    const TOLERANCE = 1.0;
 
                     // Disambiguate parallel tracks
                     if (candidates.length > 1) {
@@ -173,14 +207,14 @@ class LTVProcessor {
                             let startCandidates = candidates.filter(t => {
                                 const minT = Math.min(t.pki, t.pkd);
                                 const maxT = Math.max(t.pki, t.pkd);
-                                return (startKm >= minT - TOLERANCE) && (startKm <= maxT + TOLERANCE);
+                                return (currentStartKm >= minT - TOLERANCE) && (currentStartKm <= maxT + TOLERANCE);
                             });
 
                             if (startCandidates.length > 1) {
                                 let minDistance = Infinity;
                                 let bestStart = startCandidates[0];
                                 for (const cand of startCandidates) {
-                                    const coords = GeometryUtils.findCoordsOnTramo(cand, startKm);
+                                    const coords = GeometryUtils.findCoordsOnTramo(cand, currentStartKm);
                                     if (coords) {
                                         const dist = Math.sqrt(Math.pow(coords.lat - refCoords.lat, 2) + Math.pow(coords.lon - refCoords.lon, 2));
                                         if (dist < minDistance) {
@@ -198,7 +232,7 @@ class LTVProcessor {
                     candidates.sort((a, b) => {
                         const midA = (a.pki + a.pkd) / 2;
                         const midB = (b.pki + b.pkd) / 2;
-                        return startKm < endKm ? midA - midB : midB - midA;
+                        return currentStartKm < currentEndKm ? midA - midB : midB - midA;
                     });
 
                     let totalPath = [];
@@ -206,7 +240,7 @@ class LTVProcessor {
                     let minDesignSpeed = Infinity;
 
                     for (const tramo of candidates) {
-                        const tramoPath = GeometryUtils.sliceTramoByPk(tramo, startKm, isNaN(endKm) ? startKm : endKm);
+                        const tramoPath = GeometryUtils.sliceTramoByPk(tramo, currentStartKm, isNaN(currentEndKm) ? currentStartKm : currentEndKm);
                         if (tramoPath.length > 0) {
                             if (totalPath.length > 0) {
                                 const lastPoint = totalPath[totalPath.length - 1];
@@ -226,7 +260,7 @@ class LTVProcessor {
                                 const dSpeed = designSpeeds.get(tramo.codtramo);
                                 minDesignSpeed = Math.min(minDesignSpeed, dSpeed);
                                 const ltvSpeedMatch = record.speed.match(/(\d+)/);
-                                if (ltvSpeedMatch && !isNaN(endKm)) {
+                                if (ltvSpeedMatch && !isNaN(currentEndKm)) {
                                     const ltvSpeed = parseInt(ltvSpeedMatch[1], 10);
                                     const tMin = Math.min(tramo.pki, tramo.pkd);
                                     const tMax = Math.max(tramo.pki, tramo.pkd);
@@ -246,7 +280,7 @@ class LTVProcessor {
                         const midIndex = Math.floor(totalPath.length / 2);
                         record.latitude = totalPath[midIndex][1];
                         record.longitude = totalPath[midIndex][0];
-                        record.geocodingMethod = 'wfs';
+                        record.geocodingMethod = pkTransformed ? 'wfs_transformed' : 'wfs';
                         if (minDesignSpeed !== Infinity) {
                             record.designSpeed = minDesignSpeed;
                             record.delaySeconds = Math.round(totalDelay * 10) / 10;
@@ -288,16 +322,16 @@ class LTVProcessor {
                     const lon = record.longitude.toFixed(4);
                     const cacheKey = `${lat},${lon}`;
 
-                    if (cacheData[cacheKey]) {
-                        record.province = cacheData[cacheKey].province;
-                        record.state = cacheData[cacheKey].state;
+                    if (this.geoCache[cacheKey]) {
+                        record.province = this.geoCache[cacheKey].province;
+                        record.state = this.geoCache[cacheKey].state;
                         continue;
                     }
 
                     const { province, ccaa } = GeoDataService.getGeoInfoForPoint([record.longitude, record.latitude]);
                     if (province) record.province = province;
                     if (ccaa) record.state = ccaa;
-                    cacheData[cacheKey] = { province, state: ccaa };
+                    this.geoCache[cacheKey] = { province, state: ccaa };
                 }
             }
         }
@@ -313,39 +347,38 @@ class LTVProcessor {
         
         console.log('--- Processing DHLTV ---');
         const { enriched: av, lineStats: avStats } = await this.processFilesBySuffix('_dhltv.json', Config.LTV_AV_JSON);
-        
-        const combinedStatsMap = new Map();
+                const combinedStatsMap = new Map();
         [...ltvStats, ...avStats].forEach(s => {
             const lineNumMatch = s.line.match(/LÍNEA\s+(\d{3})/);
             const lineId = lineNumMatch ? lineNumMatch[1] : s.line;
             
             if (!combinedStatsMap.has(lineId)) {
-                combinedStatsMap.set(lineId, { ...s, networks: [s.network] });
-                delete combinedStatsMap.get(lineId).network;
+                combinedStatsMap.set(lineId, JSON.parse(JSON.stringify(s)));
+                const entry = combinedStatsMap.get(lineId);
+                entry.networks = [s.network];
+                delete entry.network;
             } else {
                 const existing = combinedStatsMap.get(lineId);
                 existing.ltvTotalKm = Math.round((existing.ltvTotalKm + s.ltvTotalKm) * 100) / 100;
                 existing.ltvPercentage = existing.totalLengthKm > 0 ? Math.round((existing.ltvTotalKm / existing.totalLengthKm) * 10000) / 100 : 0;
                 if (!existing.networks.includes(s.network)) existing.networks.push(s.network);
                 
-                const existingGeoMap = new Map();
-                existing.geography.forEach(g => existingGeoMap.set(g.name, g));
+                // Efficiently merge geography
                 s.geography.forEach(g => {
-                    if (!existingGeoMap.has(g.name)) {
-                        existing.geography.push(g);
+                    let eg = existing.geography.find(ex => ex.name === g.name);
+                    if (!eg) {
+                        existing.geography.push(JSON.parse(JSON.stringify(g)));
                     } else {
-                        const eg = existingGeoMap.get(g.name);
                         eg.totalKm = Math.max(eg.totalKm, g.totalKm);
                         eg.ltvKm = Math.round((eg.ltvKm + g.ltvKm) * 100) / 100;
                         eg.ltvPercentage = eg.totalKm > 0 ? Math.round((eg.ltvKm / eg.totalKm) * 10000) / 100 : 0;
                         
-                        const provMap = new Map();
-                        eg.provinces.forEach(p => provMap.set(p.name, p));
+                        // Merge provinces
                         g.provinces.forEach(p => {
-                            if (!provMap.has(p.name)) {
-                                eg.provinces.push(p);
+                            let ep = eg.provinces.find(exP => exP.name === p.name);
+                            if (!ep) {
+                                eg.provinces.push(JSON.parse(JSON.stringify(p)));
                             } else {
-                                const ep = provMap.get(p.name);
                                 ep.totalKm = Math.max(ep.totalKm, p.totalKm);
                                 ep.ltvKm = Math.round((ep.ltvKm + p.ltvKm) * 100) / 100;
                                 ep.ltvPercentage = ep.totalKm > 0 ? Math.round((ep.ltvKm / ep.totalKm) * 10000) / 100 : 0;

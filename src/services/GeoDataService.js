@@ -12,6 +12,7 @@ class GeoDataService {
 
     load() {
         if (this.isLoaded) return;
+        this.isLoaded = true; // Mark as loaded immediately to avoid redundant checks
         try {
             if (fs.existsSync(PROVINCES_FILE)) {
                 this.provincesGeoJSON = JSON.parse(fs.readFileSync(PROVINCES_FILE, 'utf8'));
