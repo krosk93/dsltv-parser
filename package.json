@@ -12,6 +12,7 @@
     "@turf/turf": "^7.3.4",
     "axios": "^1.13.5",
     "fs-extra": "^11.3.3",
+    "fuse.js": "^7.3.0",
     "node-telegram-bot-api": "^0.67.0",
     "pdf-parse": "^2.4.5"
   }

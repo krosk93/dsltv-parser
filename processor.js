@@ -4,6 +4,7 @@ const { PDFParse } = require('pdf-parse');
 const turf = require('@turf/turf');
 const axios = require('axios');
 const crypto = require('crypto');
+const Fuse = require('fuse.js');
 
 const PDF_DIR = path.join(__dirname, 'pdfs');
 const OUTPUT_DIR = path.join(__dirname, 'output');
@@ -25,11 +26,27 @@ function normalize(text) {
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/'/g, '')
         .replace(/\b(madrid|barcelona|valencia|sevilla|donostia|bilbao|barna|irun)[\s.-]+/g, '')
-        .replace(/\b(apd|cgd|estacion|estacio|est|mercan|pk|p\.k\.|bif)[\s.-]+/g, '')
+        .replace(/\b(apd|cgd|estacion|estacio|est|mercan|pk|p\.k\.|bif|vif)[\s.-]+/g, '')
         .replace(/glories(?:[\s.-]*clot)?/g, 'glorias')
         .replace(/[^a-z0-9]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+/**
+ * Splits stations string using the regex: [\w\d\.]-\s
+ * Ensures the character before the hyphen is preserved.
+ */
+function splitStations(stationsStr) {
+    if (!stationsStr) return [];
+    // The user specifies [\w\d\.]-\s as the separator.
+    // We use a replacement to insert a | which is unlikely to be in station names,
+    // then split by it.
+    return stationsStr
+        .replace(/([\w\d\.])-\s/g, '$1|')
+        .split('|')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
 }
 
 function clean(val) {
@@ -515,6 +532,7 @@ async function geocode(ltvData, isAv = false) {
         }
     }
     const stationList = Array.from(stationMap.entries()).map(([norm, coords]) => ({ norm, coords })).sort((a, b) => a.norm.length - b.norm.length);
+    const stationFuse = new Fuse(stationList, { keys: ['norm'], threshold: 0.3, distance: 100 });
 
     // ── Phase 1: WFS-based geocoding using ADIF PKTeoricos ──
     let wfsResolved = 0;
@@ -582,14 +600,26 @@ async function geocode(ltvData, isAv = false) {
                 // Disambiguate parallel tracks if needed (using station names)
                 // Filter candidates to stay on the same "track" (codtramo suffix often helps)
                 if (candidates.length > 1) {
-                    const recordStations = record.stations.split(/[-\s]+/).filter(s => s.length > 2);
+                    const recordStations = splitStations(record.stations);
                     let refCoords = null;
+                    const foundCoords = [];
                     for (const st of recordStations) {
                         const normSt = normalize(st);
                         if (stationMap.has(normSt)) {
-                            refCoords = stationMap.get(normSt);
-                            break;
+                            foundCoords.push(stationMap.get(normSt));
+                        } else {
+                            const fuzzy = stationFuse.search(normSt);
+                            if (fuzzy.length > 0) {
+                                foundCoords.push(fuzzy[0].item.coords);
+                            }
                         }
+                    }
+
+                    if (foundCoords.length > 0) {
+                        refCoords = {
+                            lat: foundCoords.reduce((sum, c) => sum + c.lat, 0) / foundCoords.length,
+                            lon: foundCoords.reduce((sum, c) => sum + c.lon, 0) / foundCoords.length
+                        };
                     }
 
                     if (refCoords) {
@@ -710,32 +740,37 @@ async function geocode(ltvData, isAv = false) {
         for (const record of ltvData[lineName]) {
             if (record.latitude && record.longitude) continue;
 
-            const parts = record.stations.split(/-\s+|\s+-/);
-            const coords = [];
-            for (const part of parts) {
+            const recordStations = splitStations(record.stations);
+            const foundCoords = [];
+            for (const part of recordStations) {
                 const normPart = normalize(part);
                 if (normPart.length === 0) continue;
                 if (stationMap.has(normPart)) {
-                    coords.push(stationMap.get(normPart));
+                    foundCoords.push(stationMap.get(normPart));
                 } else {
                     const alts = [normPart, normPart.replace(/^v/, 'b'), normPart.replace(/^b/, 'v'), normPart.replace('errenteria', 'renteria')];
                     let foundAlt = false;
                     for (const alt of alts) {
                         if (stationMap.has(alt)) {
-                            coords.push(stationMap.get(alt));
+                            foundCoords.push(stationMap.get(alt));
                             foundAlt = true;
                             break;
                         }
                     }
                     if (!foundAlt) {
-                        const match = stationList.find(s => s.norm.includes(normPart) || normPart.includes(s.norm));
-                        if (match) coords.push(match.coords);
+                        const fuzzy = stationFuse.search(normPart);
+                        if (fuzzy.length > 0) {
+                            foundCoords.push(fuzzy[0].item.coords);
+                        } else {
+                            const match = stationList.find(s => s.norm.includes(normPart) || normPart.includes(s.norm));
+                            if (match) foundCoords.push(match.coords);
+                        }
                     }
                 }
             }
-            if (coords.length > 0) {
-                const avgLat = coords.reduce((sum, c) => sum + c.lat, 0) / coords.length;
-                const avgLon = coords.reduce((sum, c) => sum + c.lon, 0) / coords.length;
+            if (foundCoords.length > 0) {
+                const avgLat = foundCoords.reduce((sum, c) => sum + c.lat, 0) / foundCoords.length;
+                const avgLon = foundCoords.reduce((sum, c) => sum + c.lon, 0) / foundCoords.length;
                 record.latitude = avgLat;
                 record.longitude = avgLon;
                 record.geocodingMethod = 'station';
